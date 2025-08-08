@@ -126,19 +126,25 @@ class MainWindow(QMainWindow):
     @staticmethod
     def is_process_running(pid_path):
         # 仅支持单实例运行，通过pid文件判断进程是否已存在
-        try:
-            with open(pid_path, 'r', encoding='utf-8') as f:
-                pid = int(f.read())
-            if psutil.pid_exists(pid) and psutil.Process(pid).name() in ('Aoe4mmr.exe', 'python.exe'):
-                return False
-            else:
-                with open(pid_path, 'w', encoding='utf-8') as f:
-                    f.write(str(os.getpid()))
-                return True
-        except:
+        if not os.path.exists(pid_path):
+            os.makedirs(os.path.dirname(pid_path), exist_ok=True)
             with open(pid_path, 'w', encoding='utf-8') as f:
                 f.write(str(os.getpid()))
             return True
+        else:
+            try:
+                with open(pid_path, 'r', encoding='utf-8') as f:
+                    pid = int(f.read())
+                if psutil.pid_exists(pid) and psutil.Process(pid).name() in ('Aoe4mmr.exe', 'python.exe'):
+                    return False
+                else:
+                    with open(pid_path, 'w', encoding='utf-8') as f:
+                        f.write(str(os.getpid()))
+                    return True
+            except:
+                with open(pid_path, 'w', encoding='utf-8') as f:
+                    f.write(str(os.getpid()))
+                return True
 
     def get_all_data(self):
         # 连接资源数据库，获取地图和图标数据
@@ -610,6 +616,7 @@ class MainWindow(QMainWindow):
         self.show_apm_checkbox.setGeometry(360, 60, 20, 30)
         self.show_apm_checkbox.setChecked([False if self.show_apm == 0 else True][0])
         self.show_apm_checkbox.stateChanged.connect(self.show_apm_changed)
+
         self.able_dragging_label = QLabel(parent=self.setwindowwidget, text='支持拖拽窗口：')
         self.able_dragging_label.setGeometry(400, 60, 300, 30)
         self.able_dragging_checkbox = QCheckBox(parent=self.setwindowwidget)
@@ -857,6 +864,7 @@ class MainWindow(QMainWindow):
     def setting(self):
         # 任务栏右键单开菜单，单击设置时，打开设置窗口
         self.setwindowwidget.show()
+        self.setwindowwidget.activateWindow()
         # self.hide()
         self.setprofileidwidget.hide()
 
@@ -1076,44 +1084,52 @@ class MainWindow(QMainWindow):
         self.player1.setObjectName('player1')
         self.player1.setGeometry(80, 40, 240, 30)
         self.player1.setText('player1')
+        self.player1.set_text_color("#CC9F4A")
         self.player1.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.player2 = OutlinedLabel(parent=self.uiwidget)
         self.player2.setObjectName('player2')
         self.player2.setGeometry(80, 80, 240, 30)
         self.player2.setText('player2')
+        self.player2.set_text_color("#CC9F4A")
         self.player2.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.player3 = OutlinedLabel(parent=self.uiwidget)
         self.player3.setObjectName('player3')
         self.player3.setGeometry(80, 120, 240, 30)
         self.player3.setText('player3')
+        self.player3.set_text_color("#CC9F4A")
         self.player3.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.player4 = OutlinedLabel(parent=self.uiwidget)
         self.player4.setObjectName('player4')
         self.player4.setGeometry(80, 160, 240, 30)
         self.player4.setText('player4')
+        self.player4.set_text_color("#CC9F4A")
         self.player4.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.player1mmr = OutlinedLabel(parent=self.uiwidget)
         self.player1mmr.setObjectName('player1mmr')
         self.player1mmr.setFont(self.global_font)
+        self.player1mmr.set_text_color("#CC9F4A")
         self.player1mmr.setGeometry(330, 38, 120, 30)
         self.player1mmr.setText('1500')
 
         self.player2mmr = OutlinedLabel(parent=self.uiwidget)
         self.player2mmr.setObjectName('player2mmr')
+        self.player2mmr.set_text_color("#CC9F4A")
         self.player2mmr.setGeometry(330, 78, 120, 30)
         self.player2mmr.setText('1500')
 
         self.player3mmr = OutlinedLabel(parent=self.uiwidget)
         self.player3mmr.setObjectName('player3mmr')
+        self.player3mmr.set_text_color("#CC9F4A")
         self.player3mmr.setGeometry(330, 118, 120, 30)
         self.player3mmr.setText('1500')
 
         self.player4mmr = OutlinedLabel(parent=self.uiwidget)
         self.player4mmr.setObjectName('player4mmr')
+        self.player4mmr.set_text_color("#CC9F4A")
         self.player4mmr.setGeometry(330, 158, 120, 30)
         self.player4mmr.setText('1500')
 
@@ -1121,11 +1137,13 @@ class MainWindow(QMainWindow):
         self.player5.setObjectName('player5')
         self.player5.setGeometry(650, 40, 240, 30)
         self.player5.setText('player5')
+        self.player5.set_text_color("#CC9F4A")
         self.player5.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         self.player6 = OutlinedLabel(parent=self.uiwidget)
         self.player6.setObjectName('player6')
         self.player6.setGeometry(650, 80, 240, 30)
+        self.player6.set_text_color("#CC9F4A")
         self.player6.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.player6.setText('player6')
 
@@ -1134,36 +1152,42 @@ class MainWindow(QMainWindow):
         self.player7.setGeometry(650, 120, 240, 30)
         self.player7.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.player7.setText('player7')
+        self.player7.set_text_color("#CC9F4A")
 
         self.player8 = OutlinedLabel(parent=self.uiwidget)
         self.player8.setObjectName('player8')
         self.player8.setGeometry(650, 160, 240, 30)
         self.player8.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.player8.setText('player8')
+        self.player8.set_text_color("#CC9F4A")
 
         self.player5mmr = OutlinedLabel(parent=self.uiwidget)
         self.player5mmr.setObjectName('player5mmr')
         self.player5mmr.setGeometry(510, 38, 120, 30)
         self.player5mmr.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.player5mmr.setText('1500')
+        self.player5mmr.set_text_color("#CC9F4A")
 
         self.player6mmr = OutlinedLabel(parent=self.uiwidget)
         self.player6mmr.setObjectName('player6mmr')
         self.player6mmr.setGeometry(510, 78, 120, 30)
         self.player6mmr.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.player6mmr.setText('1500')
+        self.player6mmr.set_text_color("#CC9F4A")
 
         self.player7mmr = OutlinedLabel(parent=self.uiwidget)
         self.player7mmr.setObjectName('player7mmr')
         self.player7mmr.setGeometry(510, 118, 120, 30)
         self.player7mmr.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.player7mmr.setText('1500')
+        self.player7mmr.set_text_color("#CC9F4A")
 
         self.player8mmr = OutlinedLabel(parent=self.uiwidget)
         self.player8mmr.setObjectName('player8mmr')
         self.player8mmr.setGeometry(510, 158, 120, 30)
         self.player8mmr.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.player8mmr.setText('1500')
+        self.player8mmr.set_text_color("#CC9F4A")
 
     def format_text(self, player_mmr, win_rate, i):
         if i < 5:
