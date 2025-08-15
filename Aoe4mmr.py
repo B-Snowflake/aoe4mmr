@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 # Author: B_Snowflake
 # Date: 2025/4/1
-
+import ctypes
 import os
 import re
 import sys
@@ -10,17 +10,17 @@ import win32process
 import pynput
 import data
 import time
-import psutil
 import sqlite3
 import keyboard
 import threading
 from pathlib import Path
 import pygetwindow as gw
 from types import SimpleNamespace
+from ctypes import wintypes
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtCore import Signal, QTimer, Qt, QUrl, QEvent
-from PySide6.QtGui import QFont, QPixmap, QAction, QIcon, QColor, QPainter, QKeyEvent, QFocusEvent
+from PySide6.QtGui import QFont, QPixmap, QAction, QIcon, QColor, QPainter, QKeyEvent
 from PySide6.QtWidgets import QGraphicsScene, QWidget, QGraphicsView, QLineEdit, QListWidget, QVBoxLayout
 from PySide6.QtWidgets import QMainWindow, QMenu, QSystemTrayIcon, QApplication, QLabel, QPushButton, QCheckBox, QComboBox, QMessageBox
 
@@ -59,9 +59,9 @@ class MainWindow(QMainWindow):
         except:
             self.show_apm = 0  # 启动时，默认隐藏APM界面
         try:
-            self.able_dragging = self.cur.execute("select cast(value as integer) from settings where type = 'able_dragging'").fetchone()[0]
+            self.enable_dragging = self.cur.execute("select cast(value as integer) from settings where type = 'enable_dragging'").fetchone()[0]
         except:
-            self.able_dragging = 0  # 启动时，默认禁止拖拽
+            self.enable_dragging = 0  # 启动时，默认禁止拖拽
         try:
             rs = self.cur.execute("select window, x_location, y_location from window_location")
             self.window_location = {loc[0]:  (loc[1], loc[2]) for loc in rs.fetchall()}
@@ -125,7 +125,7 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def is_process_running(pid_path):
-        # 仅支持单实例运行，通过pid文件判断进程是否已存在
+        # 仅支持单实例运行，通过pid文件判断程序是否已打开
         if not os.path.exists(pid_path):
             os.makedirs(os.path.dirname(pid_path), exist_ok=True)
             with open(pid_path, 'w', encoding='utf-8') as f:
@@ -135,7 +135,7 @@ class MainWindow(QMainWindow):
             try:
                 with open(pid_path, 'r', encoding='utf-8') as f:
                     pid = int(f.read())
-                if psutil.pid_exists(pid) and psutil.Process(pid).name() in ('Aoe4mmr.exe', 'python.exe'):
+                if MainWindow.get_process_name_by_pid(pid) in ('Aoe4mmr.exe', 'python.exe'):
                     return False
                 else:
                     with open(pid_path, 'w', encoding='utf-8') as f:
@@ -211,11 +211,94 @@ class MainWindow(QMainWindow):
             (0, 'solo_bronze_1')
         ]
 
+    @staticmethod
+    def get_process_name_by_pid(pid):
+        # 定义常量
+        TH32CS_SNAPPROCESS = 0x00000002
+        INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+        # 定义结构体
+        class PROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ('dwSize', wintypes.DWORD),
+                ('cntUsage', wintypes.DWORD),
+                ('th32ProcessID', wintypes.DWORD),
+                ('th32DefaultHeapID', ctypes.POINTER(wintypes.ULONG)),  # 使用指针类型
+                ('th32ModuleID', wintypes.DWORD),
+                ('cntThreads', wintypes.DWORD),
+                ('th32ParentProcessID', wintypes.DWORD),
+                ('pcPriClassBase', wintypes.LONG),
+                ('dwFlags', wintypes.DWORD),
+                ('szExeFile', ctypes.c_char * 260)  # 进程名缓冲区
+            ]
+        # 加载kernel32并设置函数原型
+        kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+        # 设置函数原型
+        kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+        kernel32.Process32First.restype = wintypes.BOOL
+        kernel32.Process32First.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32)]
+        kernel32.Process32Next.restype = wintypes.BOOL
+        kernel32.Process32Next.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32)]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        # 创建进程快照
+        hSnapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        # 检查快照句柄是否有效
+        if hSnapshot == INVALID_HANDLE_VALUE or not hSnapshot:
+            error_code = ctypes.get_last_error()
+            if error_code:
+                raise ctypes.WinError(error_code)
+            return None
+        pe32 = PROCESSENTRY32()
+        pe32.dwSize = ctypes.sizeof(PROCESSENTRY32)
+        # 遍历进程列表
+        process_name = None
+        # 获取第一个进程
+        if kernel32.Process32First(hSnapshot, ctypes.byref(pe32)):
+            while True:
+                # 检查是否匹配PID
+                if pe32.th32ProcessID == pid:
+                    # 提取文件名部分（去掉路径）
+                    full_name = pe32.szExeFile.decode('latin-1', errors='ignore')
+                    process_name = full_name.split('\\')[-1]
+                    break
+                # 获取下一个进程
+                if not kernel32.Process32Next(hSnapshot, ctypes.byref(pe32)):
+                    break
+        # 关闭句柄
+        kernel32.CloseHandle(hSnapshot)
+        return process_name
+
     def check_process(self, process_name='RelicCardinal.exe'):
         # 检查游戏是否已经运行
-        for proc in psutil.process_iter(['name']):
-            if proc.info['name'] == process_name:  # NOQA
-                return True
+        """Windows API"""
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        kernel32 = ctypes.WinDLL('kernel32')
+        # 创建进程快照
+        hSnapshot = kernel32.CreateToolhelp32Snapshot(2, 0)  # TH32CS_SNAPPROCESS
+        class PROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ('dwSize', ctypes.c_ulong),
+                ('cntUsage', ctypes.c_ulong),
+                ('th32ProcessID', ctypes.c_ulong),
+                ('th32DefaultHeapID', ctypes.c_void_p),
+                ('th32ModuleID', ctypes.c_ulong),
+                ('cntThreads', ctypes.c_ulong),
+                ('th32ParentProcessID', ctypes.c_ulong),
+                ('pcPriClassBase', ctypes.c_long),
+                ('dwFlags', ctypes.c_ulong),
+                ('szExeFile', ctypes.c_char * 260)
+            ]
+        pe32 = PROCESSENTRY32()
+        pe32.dwSize = ctypes.sizeof(PROCESSENTRY32)
+        if kernel32.Process32First(hSnapshot, ctypes.byref(pe32)):
+            while True:
+                if pe32.szExeFile.decode().lower() == process_name.lower():
+                    kernel32.CloseHandle(hSnapshot)
+                    return True
+                if not kernel32.Process32Next(hSnapshot, ctypes.byref(pe32)):
+                    break
+        kernel32.CloseHandle(hSnapshot)
         return False
 
     def checking_forwardwindow(self, target_process='RelicCardinal.exe'):
@@ -225,8 +308,8 @@ class MainWindow(QMainWindow):
                 window = gw.getActiveWindow()
                 if window:
                     _, pid = win32process.GetWindowThreadProcessId(window._hWnd)
-                    process = psutil.Process(pid).name()
-                    if process == target_process:
+                    process = self.get_process_name_by_pid(pid)
+                    if process in (target_process, 'python.exe', 'Aor4mmr.exe'):
                         if not self.is_counting:
                             self.initialize_count()
                             self.keyboard_listener_thread = threading.Thread(target=self.keyboard_listener_func, daemon=True)
@@ -428,15 +511,15 @@ class MainWindow(QMainWindow):
 
     def able_dragging_changed(self):
         # 更改设置（是否允许拖拽窗口）
-        if not self.able_dragging_checkbox.isChecked():
-            self.able_dragging = 0
-            self.apmwindowwidget.able_dragging = 0
-            self.cur.execute("insert or replace into settings values('0','able_dragging')")
+        if not self.enable_dragging_checkbox.isChecked():
+            self.enable_dragging = 0
+            self.apmwindowwidget.enable_dragging = 0
+            self.cur.execute("insert or replace into settings values('0','enable_dragging')")
             self.apmwindowwidget.hide()
         else:
-            self.able_dragging = 1
-            self.apmwindowwidget.able_dragging = 1
-            self.cur.execute("insert or replace into settings values('1','able_dragging')")
+            self.enable_dragging = 1
+            self.apmwindowwidget.enable_dragging = 1
+            self.cur.execute("insert or replace into settings values('1','enable_dragging')")
         self.conn.commit()
 
     def show_gui_when_start_changed(self):
@@ -459,7 +542,7 @@ class MainWindow(QMainWindow):
         self.initialize_count()
         if self.show_apm == 1:
             self.start_check_threads()
-        self.apmwindowwidget = SubWindow(self, self.uiwidget, self.save_window_position, self.able_dragging)
+        self.apmwindowwidget = SubWindow(self, self.uiwidget, self.save_window_position, self.enable_dragging)
         self.apmwindowwidget.setWindowTitle('apmtool')
         self.apmwindowwidget.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
         self.apmwindowwidget.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
@@ -617,12 +700,12 @@ class MainWindow(QMainWindow):
         self.show_apm_checkbox.setChecked([False if self.show_apm == 0 else True][0])
         self.show_apm_checkbox.stateChanged.connect(self.show_apm_changed)
 
-        self.able_dragging_label = QLabel(parent=self.setwindowwidget, text='支持拖拽窗口：')
-        self.able_dragging_label.setGeometry(400, 60, 300, 30)
-        self.able_dragging_checkbox = QCheckBox(parent=self.setwindowwidget)
-        self.able_dragging_checkbox.setGeometry(505, 60, 20, 30)
-        self.able_dragging_checkbox.setChecked([False if self.able_dragging == 0 else True][0])
-        self.able_dragging_checkbox.stateChanged.connect(self.able_dragging_changed)
+        self.enable_dragging_label = QLabel(parent=self.setwindowwidget, text='支持拖拽窗口：')
+        self.enable_dragging_label.setGeometry(400, 60, 300, 30)
+        self.enable_dragging_checkbox = QCheckBox(parent=self.setwindowwidget)
+        self.enable_dragging_checkbox.setGeometry(505, 60, 20, 30)
+        self.enable_dragging_checkbox.setChecked([False if self.enable_dragging == 0 else True][0])
+        self.enable_dragging_checkbox.stateChanged.connect(self.able_dragging_changed)
         self.restore_window_location_button = QPushButton(parent=self.setwindowwidget)
         self.restore_window_location_button.setText('复原窗口位置')
         self.restore_window_location_button.setGeometry(560, 60, 160, 30)
@@ -1345,12 +1428,12 @@ class MainWindow(QMainWindow):
         self.conn.commit()
 
     def mousePressEvent(self, event: QEvent):
-        if event.button() == Qt.MouseButton.LeftButton and self.able_dragging == 1:
+        if event.button() == Qt.MouseButton.LeftButton and self.enable_dragging == 1:
             self.mouse_start_pos = event.globalPosition().toPoint() - self.pos()
             self.dragging = True
 
     def mouseMoveEvent(self, event: QEvent):
-        if self.dragging and self.able_dragging == 1:
+        if self.dragging and self.enable_dragging == 1:
             self.move(event.globalPosition().toPoint() - self.mouse_start_pos)
 
     def mouseReleaseEvent(self, event: QEvent):
@@ -1428,7 +1511,7 @@ class OutlinedLabel(QLabel):
 
 
 class SubWindow(QMainWindow):
-    def __init__(self, main_window, main_widget, postion_func=None, able_dragging=1, on_focus=SimpleNamespace(value=False), objectName=None):
+    def __init__(self, main_window, main_widget, postion_func=None, enable_dragging=1, on_focus=SimpleNamespace(value=False), objectName=None):
         self.on_focus = on_focus
         super().__init__()
         self.main_window = main_window
@@ -1436,7 +1519,7 @@ class SubWindow(QMainWindow):
         self.postion_func = postion_func
         self.dragging = False
         self.setObjectName(objectName)
-        self.able_dragging = able_dragging
+        self.enable_dragging = enable_dragging
 
     def closeEvent(self, event):
         event.ignore()
@@ -1447,7 +1530,7 @@ class SubWindow(QMainWindow):
             pass
 
     def mousePressEvent(self, event: QEvent):
-        if event.button() == Qt.MouseButton.LeftButton and self.testAttribute(Qt.WA_TranslucentBackground) and self.able_dragging == 1:
+        if event.button() == Qt.MouseButton.LeftButton and self.testAttribute(Qt.WA_TranslucentBackground) and self.enable_dragging == 1:
             self.mouse_start_pos = event.globalPosition().toPoint() - self.pos()
             self.dragging = True
 
