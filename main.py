@@ -8,6 +8,7 @@ import sys
 import logging
 import threading
 from pathlib import Path
+import traceback
 from src.aoe4mmr import Aoe4mmr
 from PySide6.QtCore import QStandardPaths
 from PySide6.QtWidgets import QApplication
@@ -32,6 +33,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
         "Uncaught exception",
         exc_info=(exc_type, exc_value, exc_traceback)
     )
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
     
 sys.excepthook = handle_exception
 
@@ -41,7 +43,9 @@ def thread_exception_handler(args):
         f"Uncaught threading exception in {args.thread.native_id}",
         exc_info=(args.exc_type, args.exc_value, args.exc_traceback)                                                                                                                                                                                                                                                                                                                                                                                        
     )
-
+    traceback.print_exception(
+        args.exc_type, args.exc_value, args.exc_traceback
+    )
 
 threading.excepthook = thread_exception_handler
     

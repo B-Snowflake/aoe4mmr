@@ -55,6 +55,7 @@ class Aoe4mmr:
         self.on_hotkey_changed()
         if self.settings.show_gui_when_startup:
             self.main_window.show()
+            self.main_window.raise_()
         else:
             self.main_window.hide()
         action1 = QAction("主页", self.mmr_window)
@@ -91,6 +92,7 @@ class Aoe4mmr:
             self.settings.window_location = [values.x(), values.y()]
         elif key == 'picked_profile_id':
             self.settings.picked_profile_id = values
+            self.data.profile_id = values
         elif key == 'delete_profile_id':
             self.settings.delete_profile_id(values)
             self.gui_reload('reload player', self.settings.profile_id)
@@ -100,6 +102,7 @@ class Aoe4mmr:
         try:
             self.settings.update_profile_id(*player_info)
             self.settings.picked_profile_id = (player_info[0])
+            self.data.profile_id = self.settings.picked_profile_id
             self.main_window.left_menu.toolbutton_dic['home_button'][0].click()
             self.gui_reload(reason='reload player', data=self.settings.profile_id)
         except Exception as e:
@@ -134,9 +137,9 @@ class Aoe4mmr:
         
         conn, cur = connect()
         try:
-            self.cur.execute('select name, version from version where name = "database"')
-            database_version = self.cur.fetchone()[0]
-        except:
+            cur.execute('select name, version from version where name = "database"')
+            database_version = cur.fetchone()[1]
+        except Exception as e:
             database_version = None
         if database_version != self.database_version:
             conn.close()
@@ -162,6 +165,7 @@ class Aoe4mmr:
         # 刷新界面数据
         if reason == 'reload game':
             self.mmr_window.gui_reload_signal.emit(data)
+            self.mmr_window.hide()
             self.main_window.menu_page.search_player_details.get_game_history(self.settings.picked_profile_id)
         elif reason == 'reload player':
             self.main_window.gui_reload_signal.emit(data)
@@ -170,7 +174,18 @@ class Aoe4mmr:
         window = self.mmr_window if window is None else window
         if window == self.mmr_window and not self.check_process():
             return
-        window.hide() if window.isVisible() else window.show()
+        if window == self.mmr_window:
+            if window.isVisible():
+                window.hide()
+            else:
+                window.show()
+        else:  
+            if window.isVisible() and window.isActiveWindow():
+                window.hide()
+            else:
+                window.hide()
+                window.show()
+                window.raise_()
 
     def on_hotkey_changed(self):
         try:
@@ -232,7 +247,7 @@ class Aoe4mmr:
                     with open(pid_path, 'w', encoding='utf-8') as f:
                         f.write(str(os.getpid()))
                     return True
-            except:
+            except Exception as e:
                 with open(pid_path, 'w', encoding='utf-8') as f:
                     f.write(str(os.getpid()))
                 return True
@@ -302,3 +317,61 @@ class Aoe4mmr:
                     break
         kernel32.CloseHandle(hSnapshot)
         return False
+    
+    @staticmethod
+    def get_process_name_by_pid(pid):
+        # 定义常量
+        TH32CS_SNAPPROCESS = 0x00000002
+        INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+        # 定义结构体
+        class PROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ('dwSize', ctypes.wintypes.DWORD),
+                ('cntUsage', ctypes.wintypes.DWORD),
+                ('th32ProcessID', ctypes.wintypes.DWORD),
+                ('th32DefaultHeapID', ctypes.POINTER(ctypes.wintypes.ULONG)),  # 使用指针类型
+                ('th32ModuleID', ctypes.wintypes.DWORD),
+                ('cntThreads', ctypes.wintypes.DWORD),
+                ('th32ParentProcessID', ctypes.wintypes.DWORD),
+                ('pcPriClassBase', ctypes.wintypes.LONG),
+                ('dwFlags', ctypes.wintypes.DWORD),
+                ('szExeFile', ctypes.c_char * 260)  # 进程名缓冲区
+            ]
+        # 加载kernel32并设置函数原型
+        kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+        # 设置函数原型
+        kernel32.CreateToolhelp32Snapshot.restype = ctypes.wintypes.HANDLE
+        kernel32.CreateToolhelp32Snapshot.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.DWORD]
+        kernel32.Process32First.restype = ctypes.wintypes.BOOL
+        kernel32.Process32First.argtypes = [ctypes.wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32)]
+        kernel32.Process32Next.restype = ctypes.wintypes.BOOL
+        kernel32.Process32Next.argtypes = [ctypes.wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32)]
+        kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [ctypes.wintypes.HANDLE]
+        # 创建进程快照
+        hSnapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        # 检查快照句柄是否有效
+        if hSnapshot == INVALID_HANDLE_VALUE or not hSnapshot:
+            error_code = ctypes.get_last_error()
+            if error_code:
+                raise ctypes.WinError(error_code)
+            return None
+        pe32 = PROCESSENTRY32()
+        pe32.dwSize = ctypes.sizeof(PROCESSENTRY32)
+        # 遍历进程列表
+        process_name = None
+        # 获取第一个进程
+        if kernel32.Process32First(hSnapshot, ctypes.byref(pe32)):
+            while True:
+                # 检查是否匹配PID
+                if pe32.th32ProcessID == pid:
+                    # 提取文件名部分（去掉路径）
+                    full_name = pe32.szExeFile.decode('latin-1', errors='ignore')
+                    process_name = full_name.split('\\')[-1]
+                    break
+                # 获取下一个进程
+                if not kernel32.Process32Next(hSnapshot, ctypes.byref(pe32)):
+                    break
+        # 关闭句柄
+        kernel32.CloseHandle(hSnapshot)
+        return process_name

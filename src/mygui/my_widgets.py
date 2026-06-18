@@ -193,12 +193,27 @@ class MenuPage(QStackedWidget):
         self.player_account_widget_combobox.setEnabled(True)
         for data in data_list[0:self.max_show_gamehistory]:
             if data[1] in self.game_history_widgets_collection.keys():
-                return
+                continue
             game_history_widgets = GameHistoryWidget(self.civilization_icon_dic, self.map_dic, data, self.apply_signal, parent=self.player_game_history_widget)
             game_id = game_history_widgets.game_id
             self.game_history_widgets_collection[game_id] = game_history_widgets
             self.player_game_history_widget_layout.addWidget(game_history_widgets)
-    
+        self.sort_game_history_widgets()
+            
+    def sort_game_history_widgets(self):
+        # 1. 取排序后的 key
+        game_history_list = sorted((int(k) for k in self.game_history_widgets_collection.keys()), reverse=True)
+        # 2. 暂存 widget
+        widgets = [self.game_history_widgets_collection[i] for i in game_history_list]
+        # 3. 清空 layout（关键）
+        while self.player_game_history_widget_layout.count():
+            item = self.player_game_history_widget_layout.takeAt(0)
+            if item.widget():
+                item.widget().setParent(None)
+        # 4. 按顺序重新加入
+        for w in widgets:
+            self.player_game_history_widget_layout.addWidget(w)
+            
     @staticmethod
     def set_by_data(combo, target):
         index = combo.findData(target) if combo.findData(target) != -1 else 0
@@ -248,7 +263,9 @@ class MenuPage(QStackedWidget):
             self.player_account_widget_combobox.addItem(profile_name, profile_id)
         self.player_account_widget_combobox.setCurrentIndex(-1)
         self.player_account_widget_combobox.blockSignals(False)
-        self.player_account_widget_combobox.setCurrentIndex(self.set_by_data(self.player_account_widget_combobox, self.picked_profile_id))
+        picked_profile_id = self.applyed_player_info[0] if self.applyed_player_info else self.picked_profile_id
+        self.player_account_widget_combobox.setCurrentIndex(self.set_by_data(self.player_account_widget_combobox, picked_profile_id))
+        self.applyed_player_info = None
             
     def set_new_page(self):
         
