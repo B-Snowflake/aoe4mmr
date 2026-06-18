@@ -1,0 +1,7 @@
+.vscode/
+.venv/
+**/__pycache__/
+asd.py
+data_bak.pck
+resources_rc.py
+data_rc.py

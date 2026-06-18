@@ -1,0 +1,233 @@
+/* /////////////////////////////////////////////////////////////////////////////////////////////////
+
+# Author: B_Snowflake
+# Date: 2026/3/21
+
+///////////////////////////////////////////////////////////////////////////////////////////////// */
+
+QWidget {
+    background-color: transparent;
+}
+
+QWidget#center_widget {
+    background-color: transparent;
+    border: none;
+}
+
+QWidget#left_menu QToolButton {
+    background-color: transparent;
+    padding: 0px;
+    border: none;
+    border-radius: 5px;
+}
+
+QWidget#left_menu QToolButton:hover {
+    background-color: rgb(234, 234, 234);
+    padding: 0px;
+    border: none;
+    border-radius: 5px;
+}
+
+QWidget#left_menu QToolButton:checked  {
+    background-color: rgb(219, 219, 219);
+    padding: 0px;
+    border: none;
+    border-radius: 5px;
+}
+
+QWidget#menu_page {
+    background-color: rgb(243, 243, 243);
+    border: none;
+}
+
+QFrame#setting_page_frame {
+    background-color: rgb(251, 251, 251);
+    border: 2px solid rgb(219, 219, 219);
+    border-radius: 10px;
+}
+
+QWidget#title_bar {
+    background-color: transparent;
+    border: none;
+    border-top-right-radius: 9px; /* 比窗口圆角小 1px 更贴合 */
+    border-top-left-radius: 9px;
+}
+
+QWidget#setting_page_left_menu_widget {
+    background-color: rgb(234, 234, 234);
+}
+
+QPushButton#setting_page_left_menu_widget_button{
+    background-color: transparent;
+    border: none;
+}
+
+QPushButton#setting_page_left_menu_widget_button::checked{
+    background-color: rgb(219, 219, 219);
+    border: none;
+}
+
+QPushButton#close_button {
+    background-color: transparent;
+    border: none;
+    border-top-right-radius: 10px;   /* 👈 只让右上角圆 */
+    border-top-left-radius: 0px;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+QPushButton#close_button:hover {
+    background-color: #c50f1f;
+}
+
+QPushButton#close_button:pressed {
+    background-color: #a80000;
+}
+
+QPushButton#setting_page_widget_close_button {
+    background-color: transparent;
+    border: none;
+    border-top-right-radius: 10px;   /* 👈 只让右上角圆 */
+    border-top-left-radius: 0px;
+    border-bottom-left-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+QPushButton#setting_page_widget_close_button:hover {
+    background-color: #c50f1f;
+}
+
+QPushButton#setting_page_widget_close_button:pressed {
+    background-color: #a80000;
+}
+
+QPushButton#setting_button {
+    background-color: transparent;
+    border: none;
+}
+
+QPushButton#setting_button:hover {
+    background-color: #d0e6ff;
+}
+
+QPushButton#setting_button:pressed {
+    background-color: #adcfff;
+}
+
+QPushButton#min_button {
+    background-color: transparent;
+    border: none;
+}
+
+QPushButton#min_button:hover {
+    background-color: #d0e6ff;
+}
+
+QPushButton#min_button:pressed {
+    background-color: #adcfff;
+}
+
+QPushButton#max_button {
+    background-color: transparent;
+    border: none;
+}
+
+QPushButton#max_button:hover {
+    background-color: #d0e6ff;
+}
+
+QPushButton#max_button:pressed {
+    background-color: #adcfff;
+}
+
+QLineEdit#setting_page_widget_max_show_gamehistory_lineedit {
+    border: 1px solid rgb(219, 219, 219);
+    background: rgb(251, 251, 251);
+}
+
+QDialog {
+    background-color: rgb(251, 251, 251);
+    border: 2px solid rgb(219, 219, 219);
+    border-radius: 10px;
+}
+
+QLineEdit {
+    border: none;
+    background: rgb(251, 251, 251);
+}
+
+QTableWidget{
+    border: none;
+    background: rgb(243, 243, 243);
+}
+
+QHeaderView::section {
+    border: none;
+    background: rgb(243, 243, 243);
+}
+
+QLabel#player_detail_icon_widget_player_name{
+    font-size: 18px;
+    font-weight: bold;
+}
+
+QLabel#player_detail_tm_rank_widget_label{
+    font-weight: bold;
+}
+
+QLabel#player_detail_qm_widget_label{
+    font-weight: bold;
+}
+
+QLabel#player_detail_rank_matchmaking_widget_label{
+    font-weight: bold;
+}
+
+QLabel#player_detail_solo_rank_widget_label{
+    font-weight: bold;
+}
+
+QScrollArea {
+    background-color: transparent;
+    border: none; /* 滚动区域边框 */
+}
+QScrollBar:vertical {       /* 垂直滚动条 */
+    border: none; /* 去掉边框 */
+    background: rgb(255,255,255); /* 滚动条背景颜色 */
+    width: 10px; /* 滚动条宽度 */
+    margin: 0px 0 0px 0; /* 滚动条上下间距 */
+}
+QScrollBar::handle:vertical {
+    background: rgb(219,219,219); /* 滚动条滑块颜色 */
+    min-height: 20px; /* 滚动条滑块最小高度 */
+    border-radius: 3px; /* 滚动条滑块圆角 */
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical {
+    background: none;        /* 滚动条上下按钮背景 */
+    height: 0;               /* 隐藏按钮 */
+}
+QScrollBar::up-arrow:vertical,
+QScrollBar::down-arrow:vertical {
+    background: none;        /* 隐藏箭头 */
+}
+QScrollBar:horizontal {      /* 水平滚动条滑块 */
+    border: none; /* 去掉边框 */
+    background: rgb(255,255,255); /* 滚动条背景颜色 */
+    width: 10px; /* 滚动条宽度 */
+    margin: 0px 0 0px 0; /* 滚动条上下间距 */
+}
+QScrollBar::handle:horizontal {
+    background: rgb(219,219,219); /* 滚动条滑块颜色 */
+    min-height: 20px; /* 滚动条滑块最小高度 */
+    border-radius: 3px; /* 滚动条滑块圆角 */
+}
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal {
+    background: none;        /* 隐藏按钮 */
+    width: 0;                /* 隐藏按钮 */
+}
+QScrollBar::left-arrow:horizontal,
+QScrollBar::right-arrow:horizontal {
+    background: none;        /* 隐藏箭头 */
+}
