@@ -31,6 +31,7 @@ class Data:
         self.map_dic = {key: values[0] for key, values in map_dic.items()}  # 地图中英文对照表
         self.version_check_url = 'https://github.com/B-Snowflake/aoe4mmr/releases/latest'
         self.version_check_time = None
+        self.version_player_check()
         
     def version_player_check(self):
         threading.Thread(target=self.update_player_name, daemon=True).start()

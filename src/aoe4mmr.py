@@ -21,11 +21,10 @@ class Aoe4mmr:
     def __init__(self, base_path, pid_path, app_name):
         self.base_path = base_path
         self.pid_path = pid_path
-        self.database_version = '1.2.0'
-        self.app_version = '1.2.0'
+        self.database_version = 'v1.2.0'
+        self.app_version = 'v1.2.0'
         self.get_all_rc_data()
         self.app_name = app_name
-        self.datalog_path = self.base_path / "data.log"
         self.settings_path = self.base_path / "settings.json"
         self.database_path = self.base_path / "database.db"
         self.initilize_database()
@@ -35,7 +34,7 @@ class Aoe4mmr:
         self.settings.load(self.settings_path)                      
         self.data = data.Data(self.gui_reload, self.settings.picked_profile_id, self.database_path, self.map_dic, self.settings.profile_id.keys(), self.new_version)
         self.game_process_check_timer = QTimer()
-        self.game_process_check_timer.setInterval(5000)
+        self.game_process_check_timer.setInterval(10000)
         self.game_process_check_timer.timeout.connect(self.game_process_check_timer_timeout)
         self.game_process_check_timer.start()
         self.setupUI()
