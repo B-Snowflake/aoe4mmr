@@ -8,7 +8,6 @@
 import re
 import sys
 import threading
-import debugpy
 import keyboard
 # noinspection PyPackages
 from . import window_rc
@@ -67,7 +66,7 @@ class MyWindow(QMainWindow):
 
         self.close_button = QPushButton(parent=self, ObjectName='close_button')
         self.close_button.setIcon(QPixmap(":images/icons/icon_close.png"))
-        self.close_button.clicked.connect(self.close)
+        self.close_button.clicked.connect(self.hide)
         self.close_button.setFixedSize(34, 34)
 
         self.center_layout = QVBoxLayout(self.center_widget)
@@ -93,7 +92,11 @@ class MyWindow(QMainWindow):
         self.body_layout.addWidget(self.left_menu)
         self.body_layout.addWidget(self.menu_page)
         self.set_setting_page()
-        if not debugpy.is_client_connected():
+        try:    
+            import debugpy
+            if not debugpy.is_client_connected():
+                threading.Thread(target=self.mouse_listening, daemon=True).start()
+        except:
             threading.Thread(target=self.mouse_listening, daemon=True).start()
     
     def on_new_version_founded(self):

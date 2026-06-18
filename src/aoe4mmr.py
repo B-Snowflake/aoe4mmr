@@ -67,6 +67,7 @@ class Aoe4mmr:
         self.tray_icon_menu.addAction(action2)
         self.tray_icon = QSystemTrayIcon(self.mmr_window)
         self.tray_icon.setIcon(self.app_icon)
+        self.tray_icon.setToolTip('Aoe4mmr')
         self.tray_icon.setContextMenu(self.tray_icon_menu)
         self.tray_icon.activated.connect(self.tray_icon_clicked)
         self.tray_icon.show()

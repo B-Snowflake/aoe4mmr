@@ -15,7 +15,6 @@ import requests
 import func_timeout
 from retrying import retry
 from datetime import datetime
-from rapidfuzz import fuzz
 
 
 class Data:
