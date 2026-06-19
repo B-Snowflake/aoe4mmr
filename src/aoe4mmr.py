@@ -93,6 +93,7 @@ class Aoe4mmr:
         elif key == 'picked_profile_id':
             self.settings.picked_profile_id = values
             self.data.profile_id = values
+            self.mmr_window.set_now_availiable_id(values)
         elif key == 'delete_profile_id':
             self.settings.delete_profile_id(values)
             self.gui_reload('reload player', self.settings.profile_id)

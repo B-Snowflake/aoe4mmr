@@ -89,7 +89,7 @@ class Data:
                 last_game_json = json.loads(lastgame.content.decode())
                 game_id = str(last_game_json['game_id'])
                 # 如果该局游戏是新开的，则请求该对局数据
-                if game_id != self.last_game_id:
+                if game_id != self.last_game_id and last_game_json['ongoing']:
                 # if game_id != self.last_game_id:
                     map = last_game_json['map']
                     try:

@@ -484,6 +484,9 @@ class MmrWindow(QMainWindow):
         self.hide_timer.timeout.connect(self.hide)
         self.setupUI()
 
+    def set_now_availiable_id(self, id):
+        self.now_availiable_id = id
+    
     def player_icon(self, civilization):
         # 根据文明返回图标
         pixmap = QPixmap()
@@ -960,7 +963,7 @@ class MmrWindow(QMainWindow):
     
     def checkplayer(self, player_id):
         # 检查该选手是否玩家本人
-        return player_id == self.now_availiable_id
+        return str(player_id) == self.now_availiable_id
     
     def close(self):
         self.hide()
