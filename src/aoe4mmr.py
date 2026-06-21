@@ -4,6 +4,7 @@
 # LastEditTime: 2026/5/25 03:36:13
 
 import ctypes
+from itertools import zip_longest
 import os
 import sqlite3
 import threading
@@ -19,10 +20,11 @@ from PySide6.QtWidgets import *
 
 class Aoe4mmr:                                                                                                                                    
     def __init__(self, base_path, pid_path, app_name):
+        print('主线程id:', threading.get_ident())
         self.base_path = base_path
         self.pid_path = pid_path
-        self.database_version = 'v1.2.0'
-        self.app_version = 'v1.2.0'
+        self.database_version = 'v1.2.1'
+        self.app_version = 'v1.2.1'
         self.get_all_rc_data()
         self.app_name = app_name
         self.settings_path = self.base_path / "settings.json"
@@ -58,9 +60,9 @@ class Aoe4mmr:
             self.main_window.raise_()
         else:
             self.main_window.hide()
-        action1 = QAction("主页", self.mmr_window)
+        action1 = QAction("显示", self.mmr_window)
         action2 = QAction("退出", self.mmr_window)
-        action1.triggered.connect(lambda: self.toggle_window(window=self.main_window))
+        action1.triggered.connect(lambda: self.mmr_window.hide() if self.mmr_window.isVisible() else self.mmr_window.show())
         action2.triggered.connect(self.close)
         self.tray_icon_menu = QMenu(self.mmr_window)
         self.tray_icon_menu.addAction(action1)
@@ -77,9 +79,23 @@ class Aoe4mmr:
         else:
             self.gui_reload(reason="reload player", data=self.settings.profile_id)        
     
+    def backward_forward(self, step):
+        len = self.main_window.left_menu.toolbutton_record.__len__()
+        if step == "forward" and self.main_window.left_menu.record_offset_index < 0:        
+            self.main_window.left_menu.record_offset_index = self.main_window.left_menu.record_offset_index + 1
+            button = self.main_window.left_menu.toolbutton_record[len+self.main_window.left_menu.record_offset_index-1]
+            self.main_window.left_menu.switch_page(sender=button, no_record=True)
+        elif step == "backward" and abs(self.main_window.left_menu.record_offset_index) < len :  
+            self.main_window.left_menu.record_offset_index = self.main_window.left_menu.record_offset_index - 1          
+            button = self.main_window.left_menu.toolbutton_record[len+self.main_window.left_menu.record_offset_index-1]
+            self.main_window.left_menu.switch_page(sender=button, no_record=True)
+    
     def new_version(self, version):
-        if version != self.app_version:
-            self.main_window.new_version_signal.emit()
+        a = [int(x) for x in version.lstrip('v').split('.')]
+        b = [int(x) for x in self.app_version.lstrip('v').split('.')]
+        for x, y in zip_longest(a, b, fillvalue=0):
+            if x - y > 0:
+                self.main_window.new_version_signal.emit()            
     
     def on_settings_changed(self, data):
         key, values = data
@@ -93,7 +109,7 @@ class Aoe4mmr:
         elif key == 'picked_profile_id':
             self.settings.picked_profile_id = values
             self.data.profile_id = values
-            self.mmr_window.set_now_availiable_id(values)
+            self.mmr_window.tracking_id = values
         elif key == 'delete_profile_id':
             self.settings.delete_profile_id(values)
             self.gui_reload('reload player', self.settings.profile_id)
@@ -150,6 +166,7 @@ class Aoe4mmr:
                 'create table if not exists last_game (game_id TEXT NOT NULL,player TEXT,win_rate TEXT,civilization TEXT,map TEXT,profile_id INTEGER,'
                 'player_mmr TEXT,team TEXT, kind Text,PRIMARY KEY (game_id,player))')
             cur.execute('create table if not exists version (name TEXT NOT NULL,version TEXT, PRIMARY KEY (name))')
+            cur.execute('create table if not exists player_mark (profile_id TEXT NOT NULL, flag TEXT, reason TEXT, backup1 TEXT, backup2 TEXT, backup3 TEXT, PRIMARY KEY (profile_id))')
             cur.execute("insert into version(name, version) values(?, ?)", ('database', self.database_version))
             conn.commit()
         conn.close()
@@ -157,36 +174,27 @@ class Aoe4mmr:
     def tray_icon_clicked(self, reason):
         # 双击任务栏图标时，显示/隐藏界面
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
-            if self.mmr_window.isVisible():
-                self.mmr_window.hide()
+            if self.main_window.isVisible():
+                self.main_window.hide()
             else:
-                self.mmr_window.show()
+                self.main_window.show()
                 
     def gui_reload(self, reason, data):
         # 刷新界面数据
         if reason == 'reload game':
             self.mmr_window.gui_reload_signal.emit(data)
-            self.mmr_window.hide()
             self.main_window.menu_page.search_player_details.get_game_history(self.settings.picked_profile_id)
         elif reason == 'reload player':
             self.main_window.gui_reload_signal.emit(data)
         
-    def toggle_window(self, checked=False, window=None):
+    def toggle_window(self, checked=False, window=None):        
         window = self.mmr_window if window is None else window
         if window == self.mmr_window and not self.check_process():
             return
         if window == self.mmr_window:
-            if window.isVisible():
-                window.hide()
-            else:
-                window.show()
-        else:  
-            if window.isVisible() and window.isActiveWindow():
-                window.hide()
-            else:
-                window.hide()
-                window.show()
-                window.raise_()
+            self.mmr_window.toggle_window_signal.emit()
+        else:
+            self.main_window.toggle_window_signal.emit()
 
     def on_hotkey_changed(self):
         try:
@@ -224,11 +232,6 @@ class Aoe4mmr:
         except:
             pass
         QApplication.instance().quit()
-    
-    def switch_now_availiable_id(self, new_id):
-        self.settings.update_picked_profile_id(new_id)
-        self.mmr_window.now_availiable_id = new_id
-        self.data.now_availiable_id = new_id
       
     @staticmethod
     def is_process_running(pid_path):
@@ -376,3 +379,29 @@ class Aoe4mmr:
         # 关闭句柄
         kernel32.CloseHandle(hSnapshot)
         return process_name
+    
+    
+class MouseFilter(QObject):
+    
+    backward_forward_signal = Signal(str)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.MouseButtonPress:
+            if event.button() == Qt.MouseButton.BackButton:
+                self.action_backward()
+                return True  # 阻止继续传播
+
+            if event.button() == Qt.MouseButton.ForwardButton:
+                self.action_forward()
+                return True
+
+        return super().eventFilter(obj, event)
+
+    def action_backward(self):
+        self.backward_forward_signal.emit('backward')
+
+    def action_forward(self):
+        self.backward_forward_signal.emit('forward')

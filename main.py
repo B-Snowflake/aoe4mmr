@@ -9,7 +9,7 @@ import logging
 import threading
 from pathlib import Path
 import traceback
-from src.aoe4mmr import Aoe4mmr
+from src.aoe4mmr import Aoe4mmr, MouseFilter
 from PySide6.QtCore import QStandardPaths
 from PySide6.QtWidgets import QApplication
 
@@ -56,6 +56,9 @@ if __name__ == "__main__":
     if Aoe4mmr.is_process_running(pid_path):
         app = QApplication(sys.argv)
         window = Aoe4mmr(base_path, pid_path, app_name)
+        mouse_filter = MouseFilter()
+        mouse_filter.backward_forward_signal.connect(window.backward_forward)
+        app.installEventFilter(mouse_filter)
         app.exec()
     else:
         print("Another instance is already running.")

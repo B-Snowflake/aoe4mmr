@@ -76,7 +76,7 @@ class Settings:
         try:
             data = {}
             for f in fields(self):
-                if f.name == "setting_path":
+                if f.name in ("setting_path", "max_accounts"):
                     continue
                 value = getattr(self, f.name)
                 data[f.name] = self._to_json(value)

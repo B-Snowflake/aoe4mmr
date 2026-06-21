@@ -32,6 +32,8 @@ class LeftMenu(QWidget):
         self.main_layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         self.toolbutton_dic['home_button'][0].setChecked(True)
         self.pages = pages
+        self.toolbutton_record = []
+        self.record_offset_index = 0
 
     def add_toolbutton(self, objectname, text, icon, page_index):
         toolbutton = QToolButton(text=text, parent=self)
@@ -45,14 +47,24 @@ class LeftMenu(QWidget):
         self.toolbutton_dic[objectname] = (toolbutton, page_index)
         self.main_layout.addWidget(toolbutton)
 
-    def switch_page(self):
-        sender = self.sender()
-        index = 0
+    def switch_page(self, checked=None, sender=None, no_record=False):
+        sender = sender if sender else self.sender() 
+        if not no_record:
+            if self.toolbutton_record.__len__() > 6:
+                self.toolbutton_record = self.toolbutton_record[1:]
+            if self.record_offset_index != 0:
+                index = self.toolbutton_record.__len__() + self.record_index
+                self.toolbutton_record[0:index]
+            self.record_offset_index = 0
+            self.toolbutton_record.append(sender)
+        else:
+            button.setChecked(True)
         for objectname, values in self.toolbutton_dic.items():
             button, page_index = values
             if button != sender:
                 button.setChecked(False)
             else:
+                # button.setChecked(True)
                 index = page_index
         self.pages.setCurrentIndex(index)
 
@@ -193,7 +205,7 @@ class MenuPage(QStackedWidget):
         self.player_account_widget_combobox.setEnabled(True)
         for data in data_list[0:self.max_show_gamehistory]:
             if data[1] in self.game_history_widgets_collection.keys():
-                continue
+                self.game_history_widgets_collection[data[1]].deleteLater()
             game_history_widgets = GameHistoryWidget(self.civilization_icon_dic, self.map_dic, data, self.apply_signal, parent=self.player_game_history_widget)
             game_id = game_history_widgets.game_id
             self.game_history_widgets_collection[game_id] = game_history_widgets
@@ -744,21 +756,26 @@ class GameHistoryWidget(QWidget):
             self.result_widget_layout = QHBoxLayout(self.result_widget)
             self.result_widget_layout.setContentsMargins(0, 0, 0, 0)
             self.result_widget_layout.setSpacing(5)
-            self.result_label = QLabel(parent=self.result_widget, text="↑" if self.result=='win' else "↓")
+            if self.result:
+                result_text = "↑" if self.result=='win' else "↓"
+            else:
+                result_text = " "
+            self.result_label = QLabel(parent=self.result_widget, text=result_text)
             style = "color: green" if self.result=='win' else "color: red"
             self.result_label.setStyleSheet(style)
+
             if self.rating_diff:
                 if self.rating_diff >= 10:
-                    rating_diff = f'+{self.rating_diff}'
+                    rating_diff_text = f'+{self.rating_diff}'
                 elif 0 <= self.rating_diff < 10:
-                    rating_diff = f' +{self.rating_diff}'
+                    rating_diff_text = f' +{self.rating_diff}'
                 elif -10 < self.rating_diff < 0:
-                    rating_diff = f' {self.rating_diff}'
+                    rating_diff_text = f' {self.rating_diff}'
                 elif self.rating_diff < -10:
-                    rating_diff = f'{self.rating_diff}'
+                    rating_diff_text = f'{self.rating_diff}'
             else:
-                rating_diff = ' --'
-            self.rating_diff_label = QLabel(parent=self.result_widget, text=rating_diff)
+                rating_diff_text = ' --'
+            self.rating_diff_label = QLabel(parent=self.result_widget, text=rating_diff_text)
             self.rating_diff_label.setStyleSheet(style)
             
             self.result_widget_layout.addWidget(self.result_label, alignment=Qt.AlignmentFlag.AlignHCenter)

@@ -20,6 +20,7 @@ from pynput.mouse import Listener, Controller
 
 class MyWindow(QMainWindow):
 
+    toggle_window_signal = Signal()
     cursor_signal = Signal(str)
     gui_reload_signal = Signal(dict)
     settings_changed_signal = Signal(tuple)
@@ -45,6 +46,7 @@ class MyWindow(QMainWindow):
         self.center_widget = QWidget(parent=self, ObjectName="center_widget")
         self.setCentralWidget(self.center_widget)
         self.new_version_signal.connect(self.on_new_version_founded)
+        self.toggle_window_signal.connect(self.toggle_window)
         self.menu_page = my_widgets.MenuPage(self.add_new_account_signal, self.settings_changed_signal, self.settings.max_show_gamehistory, self.settings.max_accounts, self.settings.picked_profile_id, civilization_icon_dic, map_dic, parent=self, ObjectName="menu_page")
         self.menu_page.apply_signal.connect(self.apply_new)
         self.left_menu = my_widgets.LeftMenu(parent=self, pages=self.menu_page)
@@ -104,8 +106,17 @@ class MyWindow(QMainWindow):
         if msg.exec() == QDialog.Accepted:
             QDesktopServices.openUrl(QUrl("https://github.com/B-Snowflake/aoe4mmr/releases/latest"))
     
+    def toggle_window(self):
+        if self.isVisible() and self.isActiveWindow():
+            self.hide()
+        else:
+            self.hide()
+            self.show()
+            self.raise_()
+    
     def show_message(self, message):
-        CustomMessageBox(message=message)
+        msg = CustomMessageBox(message=message)
+        msg.exec()
     
     def gui_reload(self, data):
         self.menu_page.add_my_accounts_to_combobox(data)
@@ -466,12 +477,14 @@ class MyWindow(QMainWindow):
 
 class MmrWindow(QMainWindow):
     
+    toggle_window_signal = Signal()
     gui_reload_signal = Signal(tuple)
     settings_changed_signal = Signal(tuple)
     
-    def __init__(self, now_availiable_id, civilization_icon_dic, rank_icon_dic, window_location, *args, **kwargs):
+    def __init__(self, tracking_id, civilization_icon_dic, rank_icon_dic, window_location, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.now_availiable_id = now_availiable_id
+        self.dragging = False
+        self.tracking_id = tracking_id
         self.civilization_icon_dic = civilization_icon_dic
         self.rank_icon_dic = rank_icon_dic
         self.enable_dragging = False
@@ -479,13 +492,14 @@ class MmrWindow(QMainWindow):
         self.window_location = window_location
         self.set_mmr_rank_map()
         self.gui_reload_signal.connect(self.gui_reload)
+        self.toggle_window_signal.connect(self.toggle_window)
         self.hide_timer = QTimer(self)
         self.hide_timer.setInterval(300000)
         self.hide_timer.timeout.connect(self.hide)
         self.setupUI()
-
-    def set_now_availiable_id(self, id):
-        self.now_availiable_id = id
+    
+    def toggle_window(self):
+        self.hide() if self.isVisible() else self.show()
     
     def player_icon(self, civilization):
         # 根据文明返回图标
@@ -963,7 +977,7 @@ class MmrWindow(QMainWindow):
     
     def checkplayer(self, player_id):
         # 检查该选手是否玩家本人
-        return str(player_id) == self.now_availiable_id
+        return str(player_id) == self.tracking_id
     
     def close(self):
         self.hide()
