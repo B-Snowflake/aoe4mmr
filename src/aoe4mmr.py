@@ -6,6 +6,7 @@
 import ctypes
 from itertools import zip_longest
 import os
+from queue import Queue
 import sqlite3
 import threading
 import keyboard
@@ -29,12 +30,13 @@ class Aoe4mmr:
         self.app_name = app_name
         self.settings_path = self.base_path / "settings.json"
         self.database_path = self.base_path / "database.db"
+        self.database_queue = Queue()
         self.initilize_database()
-        self.conn = sqlite3.connect(self.database_path)
-        self.cur = self.conn.cursor()
+        self.player_mark_dic = {}
+        threading.Thread(target=self.write_to_db, daemon=True).start()
         self.settings = settings.Settings()
         self.settings.load(self.settings_path)                      
-        self.data = data.Data(self.gui_reload, self.settings.picked_profile_id, self.database_path, self.map_dic, self.settings.profile_id.keys(), self.new_version)
+        self.data = data.Data(self.gui_reload, self.settings.picked_profile_id, self.database_queue, self.map_dic, self.settings.profile_id.keys(), self.new_version)
         self.game_process_check_timer = QTimer()
         self.game_process_check_timer.setInterval(10000)
         self.game_process_check_timer.timeout.connect(self.game_process_check_timer_timeout)
@@ -43,8 +45,8 @@ class Aoe4mmr:
         
     def setupUI(self):
         # 设置界面UI
-        self.mmr_window = win.MmrWindow(self.settings.picked_profile_id, self.civilization_icon_dic, self.rank_icon_dic, self.settings.window_location)
-        self.main_window = win.MyWindow(self.settings, self.civilization_icon_dic, self.map_dic)
+        self.mmr_window = win.MmrWindow(self.settings.picked_profile_id, self.civilization_icon_dic, self.rank_icon_dic, self.settings.window_location, self.player_mark_dic)
+        self.main_window = win.MyWindow(self.settings, self.civilization_icon_dic, self.map_dic, self.database_queue, self.player_mark_dic)
         self.main_window.setWindowIcon(self.app_icon)
         self.main_window.setWindowTitle(self.app_name)
         self.main_window.keyboard_single.connect(self.on_hotkey_changed)
@@ -60,20 +62,23 @@ class Aoe4mmr:
             self.main_window.raise_()
         else:
             self.main_window.hide()
-        action1 = QAction("显示", self.mmr_window)
-        action2 = QAction("退出", self.mmr_window)
-        action1.triggered.connect(lambda: self.mmr_window.hide() if self.mmr_window.isVisible() else self.mmr_window.show())
-        action2.triggered.connect(self.close)
+        action1 = QAction("主页", self.mmr_window)
+        action2 = QAction("对局", self.mmr_window)
+        action3 = QAction("退出", self.mmr_window)
+        action1.triggered.connect(lambda: self.toggle_window(window=self.main_window))
+        action2.triggered.connect(lambda: self.mmr_window.hide() if self.mmr_window.isVisible() else self.mmr_window.show())
+        action3.triggered.connect(self.close)
         self.tray_icon_menu = QMenu(self.mmr_window)
         self.tray_icon_menu.addAction(action1)
         self.tray_icon_menu.addAction(action2)
+        self.tray_icon_menu.addAction(action3)
         self.tray_icon = QSystemTrayIcon(self.mmr_window)
         self.tray_icon.setIcon(self.app_icon)
         self.tray_icon.setToolTip('Aoe4mmr')
         self.tray_icon.setContextMenu(self.tray_icon_menu)
         self.tray_icon.activated.connect(self.tray_icon_clicked)
         self.tray_icon.show()
-        self.load_data_from_database()
+        self.load_data_from_user_database()
         if not self.settings.profile_id:
             self.main_window.left_menu.toolbutton_dic['new_button'][0].click()
         else:
@@ -125,7 +130,7 @@ class Aoe4mmr:
         except Exception as e:
             self.main_window.show_message(message=f"添加失败，{e}")
     
-    def load_data_from_database(self):
+    def load_data_from_user_database(self):
         # 启动时，从数据库读取已保存的游戏对局数据，无数据则跳过
         try:
             self.cur.execute('select game_id from last_game limit 1')
@@ -138,21 +143,41 @@ class Aoe4mmr:
             kind = self.cur.fetchone()[0]
             self.cur.execute('select player, civilization, profile_id, player_mmr, win_rate, kind from last_game order by team, player')
             player_data = self.cur.fetchall()
+            self.cur.execute('select profile_id, flag, reason, create_time from player_mark')
+            player_marks = self.cur.fetchall()
+            for player_mark in player_marks:
+                profile_id, flag, reason, create_time = player_mark
+                self.player_mark_dic[profile_id] = (flag, reason, create_time)
             last_game_data = (map_name, game_id, game_mode, player_data, kind)
             self.gui_reload('reload game', last_game_data)
             self.data.last_game_id = game_id
             QTimer.singleShot(0, self.mmr_window.hide)
         except Exception as e:
-            pass
-        
-    def initilize_database(self):
-        # 读取用户信息数据库版本号，如果是低版本数据库或无数据库，重新初始化
-        def connect():
-            conn = sqlite3.connect(self.database_path)
-            cur = conn.cursor()
-            return conn, cur
-        
-        conn, cur = connect()
+            print(e)
+    
+    def write_to_db(self):
+        self.conn, self.cur = self.connect_to_userdb()
+        while True:
+            sql, parameters = self.database_queue.get()
+            if sql:
+                try:
+                    if parameters:
+                        self.cur.execute(sql, parameters)
+                    else:
+                        self.cur.execute(sql)
+                    self.conn.commit()
+                except Exception as e:
+                    print(f'error: {e}, when execute sql: {sql}, parameters: {parameters}')
+                finally:
+                    continue
+                
+    def connect_to_userdb(self):
+        conn = sqlite3.connect(self.database_path, check_same_thread=False)
+        cur = conn.cursor()
+        return conn, cur
+    
+    def initilize_database(self):        
+        conn, cur = self.connect_to_userdb()
         try:
             cur.execute('select name, version from version where name = "database"')
             database_version = cur.fetchone()[1]
@@ -161,12 +186,12 @@ class Aoe4mmr:
         if database_version != self.database_version:
             conn.close()
             os.remove(self.database_path)
-            conn, cur = connect()
+            conn, cur = self.connect_to_userdb()
             cur.execute(
-                'create table if not exists last_game (game_id TEXT NOT NULL,player TEXT,win_rate TEXT,civilization TEXT,map TEXT,profile_id INTEGER,'
-                'player_mmr TEXT,team TEXT, kind Text,PRIMARY KEY (game_id,player))')
+                'create table if not exists last_game (game_id INTEGER NOT NULL, player TEXT, win_rate TEXT, civilization TEXT, map TEXT, profile_id INTEGER,'
+                'player_mmr TEXT, team TEXT, kind Text, PRIMARY KEY (game_id,player))')
             cur.execute('create table if not exists version (name TEXT NOT NULL,version TEXT, PRIMARY KEY (name))')
-            cur.execute('create table if not exists player_mark (profile_id TEXT NOT NULL, flag TEXT, reason TEXT, backup1 TEXT, backup2 TEXT, backup3 TEXT, PRIMARY KEY (profile_id))')
+            cur.execute('create table if not exists player_mark (profile_id INTEGER NOT NULL, flag INTEGER, reason TEXT, create_time INTEGER, backup1 TEXT, backup2 TEXT, backup3 TEXT, PRIMARY KEY (profile_id))')
             cur.execute("insert into version(name, version) values(?, ?)", ('database', self.database_version))
             conn.commit()
         conn.close()

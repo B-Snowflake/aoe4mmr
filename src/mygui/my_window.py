@@ -29,25 +29,29 @@ class MyWindow(QMainWindow):
     keyboard_single = Signal(str)
     new_version_signal = Signal()
 
-    def __init__(self, settings, civilization_icon_dic, map_dic, *args, **kwargs):
+    def __init__(self, settings, civilization_icon_dic, map_dic, database_queue, player_mark_dic, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
         self.dragging, self.location, self.resize_dragging, self.edge_size = False, None, False, 8
         self.setWindowTitle('Aoe4Mmr')
 
+        self.database_queue = database_queue
+        self.player_mark_dic = player_mark_dic
         self.settings = settings
         self.mouse = Controller()
         self.cursor_signal.connect(self.set_resize_cursor)
         self.gui_reload_signal.connect(self.gui_reload)
         self.keyboard_single.connect(self.on_hotkey_changed)
-        # self.set_theme("src/mygui/Themes/theme.qss")
-        self.set_theme()
+        self.set_theme("src/mygui/Themes/theme.qss")
+        # self.set_theme()
         self.center_widget = QWidget(parent=self, ObjectName="center_widget")
         self.setCentralWidget(self.center_widget)
         self.new_version_signal.connect(self.on_new_version_founded)
         self.toggle_window_signal.connect(self.toggle_window)
-        self.menu_page = my_widgets.MenuPage(self.add_new_account_signal, self.settings_changed_signal, self.settings.max_show_gamehistory, self.settings.max_accounts, self.settings.picked_profile_id, civilization_icon_dic, map_dic, parent=self, ObjectName="menu_page")
+        self.menu_page = my_widgets.MenuPage(self.add_new_account_signal, self.settings_changed_signal, self.settings.max_show_gamehistory, 
+                                             self.settings.max_accounts, self.settings.picked_profile_id, civilization_icon_dic, 
+                                             map_dic, database_queue, player_mark_dic, parent=self, ObjectName="menu_page")
         self.menu_page.apply_signal.connect(self.apply_new)
         self.left_menu = my_widgets.LeftMenu(parent=self, pages=self.menu_page)
         
@@ -481,7 +485,7 @@ class MmrWindow(QMainWindow):
     gui_reload_signal = Signal(tuple)
     settings_changed_signal = Signal(tuple)
     
-    def __init__(self, tracking_id, civilization_icon_dic, rank_icon_dic, window_location, *args, **kwargs):
+    def __init__(self, tracking_id, civilization_icon_dic, rank_icon_dic, window_location, player_mark_dic, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.dragging = False
         self.tracking_id = tracking_id
@@ -977,7 +981,7 @@ class MmrWindow(QMainWindow):
     
     def checkplayer(self, player_id):
         # 检查该选手是否玩家本人
-        return str(player_id) == self.tracking_id
+        return player_id == self.tracking_id
     
     def close(self):
         self.hide()

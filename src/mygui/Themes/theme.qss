@@ -187,46 +187,70 @@ QLabel#player_detail_solo_rank_widget_label{
     font-weight: bold;
 }
 
+QComboBox#player_mark_combobox {
+    background-color: transparent;
+    border: none;
+    padding: 0px;
+}
+
+QComboBox#player_mark_combobox::down-arrow {
+    image: none;
+    width: 0px;
+}
+
+QComboBox#player_mark_combobox::drop-down {
+    width: 0px;
+    border: none;
+}
+
 QScrollArea {
     background-color: transparent;
     border: none; /* 滚动区域边框 */
 }
+
 QScrollBar:vertical {       /* 垂直滚动条 */
     border: none; /* 去掉边框 */
     background: rgb(255,255,255); /* 滚动条背景颜色 */
     width: 10px; /* 滚动条宽度 */
     margin: 0px 0 0px 0; /* 滚动条上下间距 */
 }
+
 QScrollBar::handle:vertical {
     background: rgb(219,219,219); /* 滚动条滑块颜色 */
     min-height: 20px; /* 滚动条滑块最小高度 */
     border-radius: 3px; /* 滚动条滑块圆角 */
 }
+
 QScrollBar::add-line:vertical,
 QScrollBar::sub-line:vertical {
     background: none;        /* 滚动条上下按钮背景 */
     height: 0;               /* 隐藏按钮 */
 }
+
 QScrollBar::up-arrow:vertical,
 QScrollBar::down-arrow:vertical {
     background: none;        /* 隐藏箭头 */
 }
+
 QScrollBar:horizontal {      /* 水平滚动条滑块 */
     border: none; /* 去掉边框 */
     background: rgb(255,255,255); /* 滚动条背景颜色 */
     width: 10px; /* 滚动条宽度 */
     margin: 0px 0 0px 0; /* 滚动条上下间距 */
 }
+
 QScrollBar::handle:horizontal {
     background: rgb(219,219,219); /* 滚动条滑块颜色 */
     min-height: 20px; /* 滚动条滑块最小高度 */
     border-radius: 3px; /* 滚动条滑块圆角 */
 }
+
 QScrollBar::add-line:horizontal,
 QScrollBar::sub-line:horizontal {
     background: none;        /* 隐藏按钮 */
     width: 0;                /* 隐藏按钮 */
 }
+
 QScrollBar::left-arrow:horizontal,
 QScrollBar::right-arrow:horizontal {
     background: none;        /* 隐藏箭头 */

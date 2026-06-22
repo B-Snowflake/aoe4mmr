@@ -562,6 +562,9 @@
         <file>icons/icon_minimize.png</file>
         <file>icons/icon_restore.png</file>
         <file>icons/icon_settings.png</file>
+		<file>icons/noob.png</file>
+		<file>icons/carry.png</file>
+		<file>icons/hacker.png</file>
     </qresource>
 	<qresource prefix="/themes">
 		<file>Themes/theme.qss</file>

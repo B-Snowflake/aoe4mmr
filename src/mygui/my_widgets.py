@@ -3,6 +3,7 @@
 # Date: 2026/3/22
 
 import re
+import time
 import pytz
 import json
 import urllib3
@@ -53,12 +54,12 @@ class LeftMenu(QWidget):
             if self.toolbutton_record.__len__() > 6:
                 self.toolbutton_record = self.toolbutton_record[1:]
             if self.record_offset_index != 0:
-                index = self.toolbutton_record.__len__() + self.record_index
+                index = self.toolbutton_record.__len__() + self.record_offset_index
                 self.toolbutton_record[0:index]
             self.record_offset_index = 0
             self.toolbutton_record.append(sender)
         else:
-            button.setChecked(True)
+            sender.setChecked(True)
         for objectname, values in self.toolbutton_dic.items():
             button, page_index = values
             if button != sender:
@@ -72,18 +73,22 @@ class LeftMenu(QWidget):
 class MenuPage(QStackedWidget):
     detail_signal = Signal(dict)
     apply_signal = Signal(tuple)
+    mark_signal = Signal(tuple)
     add_new_game_history_signal = Signal(list)
     
-    def __init__(self, add_new_account_signal, settings_changed_signal, max_show_gamehistory, max_accounts, picked_profile_id, civilization_icon_dic, map_dic, *args, **kwargs):
+    def __init__(self, add_new_account_signal, settings_changed_signal, max_show_gamehistory, max_accounts, 
+                 picked_profile_id, civilization_icon_dic, map_dic, database_queue, player_mark_dic, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.home_page = QWidget()
         self.new_page = QWidget()
         self.applyed_player_info = None
         self.civilization_icon_dic = civilization_icon_dic
+        self.player_mark_dic = player_mark_dic
         self.max_accounts = max_accounts
         self.picked_profile_id = picked_profile_id
         self.settings_changed_signal = settings_changed_signal
         self.map_dic = map_dic
+        self.database_queue = database_queue
         self.max_show_gamehistory = max_show_gamehistory
         self.addWidget(self.home_page)
         self.addWidget(self.new_page)  
@@ -91,6 +96,7 @@ class MenuPage(QStackedWidget):
         self.set_new_page()
         self.search_player_details = PlayerDetail(self.detail_signal, self.add_new_game_history_signal)
         self.add_new_game_history_signal.connect(self.add_new_game_history)
+        self.mark_signal.connect(self.mark_player)
         self.detail_signal.connect(self.reload_player_details)
         self.apply_signal.connect(self.apply_player_details)
         self.add_new_account_signal = add_new_account_signal
@@ -100,6 +106,14 @@ class MenuPage(QStackedWidget):
         profile_id, profile_name = player_info
         self.applyed_player_info = player_info
         self.search_player_details.get_detail(profile_id)
+    
+    def mark_player(self, data):
+        profile_id, flag, reason = data
+        create_time = int(time.time())
+        self.player_mark_dic[profile_id] = (flag, reason, create_time)
+        sql = """INSERT INTO player_mark (profile_id, flag, reason, create_time) VALUES (?, ?, ?, ?) ON CONFLICT(profile_id) 
+        DO UPDATE SET flag = excluded.flag, reason = excluded.reason"""
+        self.database_queue.put((sql, (profile_id, flag, reason, create_time)))
     
     def reload_player_details(self, data):
         def add_data_to_table(data_list, tablewidget):
@@ -206,7 +220,7 @@ class MenuPage(QStackedWidget):
         for data in data_list[0:self.max_show_gamehistory]:
             if data[1] in self.game_history_widgets_collection.keys():
                 self.game_history_widgets_collection[data[1]].deleteLater()
-            game_history_widgets = GameHistoryWidget(self.civilization_icon_dic, self.map_dic, data, self.apply_signal, parent=self.player_game_history_widget)
+            game_history_widgets = GameHistoryWidget(self.civilization_icon_dic, self.map_dic, data, self.apply_signal, self.mark_signal, self.player_mark_dic, parent=self.player_game_history_widget)
             game_id = game_history_widgets.game_id
             self.game_history_widgets_collection[game_id] = game_history_widgets
             self.player_game_history_widget_layout.addWidget(game_history_widgets)
@@ -605,13 +619,13 @@ class PlayerDetail:
                     teams = game['teams']
                     for team in teams:
                         for player in team:
-                            player_profile_id = str(player['player']['profile_id'])
+                            player_profile_id = player['player']['profile_id']
                             player_name = player['player']['name']
                             player_mmr = str(player['player']['rating']) if player['player']['rating'] else '--'
                             civilization = player['player']['civilization']
                             win_rate = '0%'
                             kind = kind
-                            if player_profile_id == profile_id:
+                            if player_profile_id == int(profile_id):
                                 rating_diff = player['player']['rating_diff']
                                 result = player['player']['result']
                             player_data.append((player_name, civilization, player_profile_id, player_mmr, win_rate, kind))
@@ -662,13 +676,15 @@ class PlayerDetail:
             
 class GameHistoryWidget(QWidget):
     
-    def __init__(self, civilization_icon_dic, map_dic, data, apply_signal, *args, **kwargs):
+    
+    def __init__(self, civilization_icon_dic, map_dic, data, apply_signal, mark_signal, player_mark_dic, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.map_name, self.game_id, self.game_mode, self.player_data, self.kind, self.rating_diff, self.result, self.profile_id = data
         self.civilization_icon_dic = civilization_icon_dic
+        self.player_mark_dic = player_mark_dic
         self.map_dic = map_dic
         self.apply_signal = apply_signal
-        game_mode = int(data[2])
+        self.mark_signal = mark_signal
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(25)
@@ -739,6 +755,14 @@ class GameHistoryWidget(QWidget):
     def on_player_name_clicked(self, player_info):
         self.apply_signal.emit(player_info)
         
+    def on_player_mark_combobox_currentIndexChanged(self):
+        sender = self.sender()
+        sender.effect.setOpacity(1)
+        player_profile_id = sender.profile_id
+        flag = sender.currentIndex()
+        reason = None
+        self.mark_signal.emit((player_profile_id, flag, reason))
+        
     def set_mid_side_widget(self):
         self.mid_side_widget_map_name_label = QLabel(parent=self.mid_side_widget, text=self.map_dic.get(self.map_name)[0])
         self.widgets_collection.append(self.mid_side_widget_map_name_label)
@@ -791,23 +815,37 @@ class GameHistoryWidget(QWidget):
             player_name_label.clicked.connect(self.on_player_name_clicked)
             player_civ_label = QLabel(parent=parent)
             player_civ_label.setPixmap(self.get_civ_icon(civilization).scaled(40, 24))
+            player_mark_combobox = ReadOnlyComboBox(parent=parent, ObjectName="player_mark_combobox")
+            player_mark_combobox.profile_id = profile_id
+            player_mark_combobox.setFixedSize(22, 22)
+            player_mark_combobox.addItem(QIcon(":images/icons/noob.png"), '')
+            player_mark_combobox.addItem(QIcon(":images/icons/carry.png"), '')
+            player_mark_combobox.addItem(QIcon(":images/icons/hacker.png"), '')
+            if (mark := self.player_mark_dic.get(profile_id)):
+                player_mark_combobox.setCurrentIndex(mark[0])
+            else:
+                player_mark_combobox.setCurrentIndex(-1)
+            player_mark_combobox.currentIndexChanged.connect(self.on_player_mark_combobox_currentIndexChanged)
             player_mmr_label = QLabel(parent=parent, text=player_mmr)
             self.widgets_collection.append(player_name_label)
             self.widgets_collection.append(player_civ_label)
+            self.widgets_collection.append(player_mark_combobox)
             self.widgets_collection.append(player_mmr_label)
-            return layout, player_name_label, player_civ_label, player_mmr_label
+            return layout, player_name_label, player_civ_label, player_mark_combobox, player_mmr_label
             
         def add_to_left_side(player, profile_id, civilization, player_mmr):
-            layout, player_name_label, player_civ_label, player_mmr_label = create_contents(player, profile_id, civilization, player_mmr, 'left')
+            layout, player_name_label, player_civ_label, player_mark_combobox, player_mmr_label = create_contents(player, profile_id, civilization, player_mmr, 'left')
             layout.addWidget(player_civ_label, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(player_name_label, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addStretch(1)
+            layout.addWidget(player_mark_combobox, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(player_mmr_label, alignment=Qt.AlignmentFlag.AlignCenter)
             self.left_side_widget_layout.addLayout(layout)
         
         def add_to_right_side(player, profile_id, civilization, player_mmr):
-            layout, player_name_label, player_civ_label, player_mmr_label = create_contents(player, profile_id, civilization, player_mmr,  'right')
+            layout, player_name_label, player_civ_label, player_mark_combobox, player_mmr_label = create_contents(player, profile_id, civilization, player_mmr,  'right')
             layout.addWidget(player_mmr_label, alignment=Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(player_mark_combobox, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addStretch(1)
             layout.addWidget(player_name_label, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(player_civ_label, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -861,3 +899,27 @@ class ClickableLabel(QLabel):
         self.setStyleSheet(self.style)
         self.setCursor(Qt.CursorShape.ArrowCursor)
         return super().leaveEvent(event)
+    
+    
+class ReadOnlyComboBox(QComboBox):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._locked = True
+
+    def setLocked(self, locked: bool):
+        self._locked = locked
+
+    def mousePressEvent(self, e):
+        if self._locked:
+            return
+        super().mousePressEvent(e)
+
+    def wheelEvent(self, e):
+        if self._locked:
+            return
+        super().wheelEvent(e)
+
+    def keyPressEvent(self, e):
+        if self._locked:
+            return
+        super().keyPressEvent(e)

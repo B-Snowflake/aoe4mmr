@@ -18,12 +18,10 @@ from datetime import datetime
 
 
 class Data:
-    def __init__(self, gui_reload, profile_id, databasepath, map_dic, profile_id_list, new_version_func):
+    def __init__(self, gui_reload, profile_id, database_queue, map_dic, profile_id_list, new_version_func):
         self.quit_signal = True  # 是否结束数据追踪动作的标志（由主线程设定）
         self.last_game_id = None
-        self.databasepath = databasepath
-        self.conn = sqlite3.connect(self.databasepath, check_same_thread=False)
-        self.cur = self.conn.cursor()
+        self.database_queue = database_queue
         self.profile_id_list = profile_id_list
         self.new_version_func = new_version_func
         self.profile_id = profile_id  # 追踪游戏对局数据的账户PID（由主线程设定）
@@ -81,16 +79,17 @@ class Data:
     def get_data(self):
         # 从API接口获取最新的游戏对局数据
         values = ''
-        player_data = []
+        player_data_list = []
+        error = False
         try:
             # 获取最新游戏对局
             lastgame = self.get_response(url=f'https://aoe4world.com/api/v0/players/{self.profile_id}/games/last')
             if lastgame:
                 last_game_json = json.loads(lastgame.content.decode())
-                game_id = str(last_game_json['game_id'])
+                game_id = last_game_json['game_id']
                 # 如果该局游戏是新开的，则请求该对局数据
-                if game_id != self.last_game_id and last_game_json['ongoing']:
-                # if game_id != self.last_game_id:
+                # if game_id != self.last_game_id and last_game_json['ongoing']:
+                if game_id != self.last_game_id:
                     map = last_game_json['map']
                     try:
                         map_chinese = self.map_dic[map]
@@ -126,32 +125,37 @@ class Data:
                             else:
                                 player_mmr = '--'
                                 win_rate = '--'
-                            value = "(" + str(game_id) + ",'" + str(player) + "','" + str(win_rate) + "','" + str(civilization) + "','" + str(map_chinese) + (
-                                "','") + str(player_profile_id) + "','" + str(player_mmr) + "'," + str(i) + ",'" + str(kind) + "')"
-                            values = ",".join([values, value])
-                            player_data.append((str(player), civilization, player_profile_id, str(player_mmr), str(win_rate), str(kind)))
+                            values = (game_id, player, str(win_rate), civilization, map_chinese, player_profile_id, str(player_mmr), str(i), kind)
+                            insert_sql = """
+                                            INSERT INTO last_game ( game_id, player, win_rate, civilization, map, profile_id, player_mmr, team, kind )
+                                            VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )
+                                        """
+                            # 写入数据库
+                            self.database_queue.put((insert_sql, values))
+                            player_data_list.append((str(player), civilization, player_profile_id, str(player_mmr), str(win_rate), str(kind)))
                     # 数据校验，如果本次请求的数据缺失，终止
                     if last_game_kind in ('rm_1v1', 'qm_1v1') and player_counts != 2:
-                        return
+                        error = True
                     elif last_game_kind in ('rm_2v2', 'qm_2v2') and player_counts != 4:
-                        return
+                        error = True
                     elif last_game_kind in ('rm_3v3', 'qm_3v3') and player_counts != 6:
-                        return
+                        error = True
                     elif last_game_kind in ('rm_4v4', 'qm_4v4') and player_counts != 8:
+                        error = True
+                    if error:
+                        self.database_queue.put(("delete from last_game where game_id = ?", (game_id, )))
+                        print(f'game_id:{game_id}, 本次获取的数据不完整')
                         return
-                    self.last_game_id = game_id
-                    # 重载gui界面
-                    last_game_data = (map_chinese, str(game_id), len(player_data), player_data, kind)
-                    self.gui_reload('reload game', last_game_data)
-                    # 写入数据库
-                    insert_sql = "insert into last_game select * from (" + values.replace(values[0], 'values', 1) + ")"
-                    self.cur.execute(insert_sql)
-                    self.cur.execute("delete from last_game where game_id <> ?", (str(game_id),))
-                    self.conn.commit()
+                    else:
+                        self.last_game_id = game_id
+                        # 重载gui界面
+                        last_game_data = (map_chinese, str(game_id), len(player_data_list), player_data_list, kind)
+                        self.gui_reload('reload game', last_game_data)
+                        self.database_queue.put(("delete from last_game where game_id <> ?", (game_id, )))
         except Exception as e:
             # 发生异常时，写入异常信息
             new_content = "\n" + time.strftime("%Y.%m.%d %H:%M:%S") + ": when request exception -- " + str(traceback.format_exc())
-            traceback.print_exc()
+            print(new_content)
             
     def worker(self):
         print('data thread start')
@@ -162,9 +166,7 @@ class Data:
                     self.get_data()
                 except func_timeout.exceptions.FunctionTimedOut as e:
                     new_content = "\n" + time.strftime("%Y.%m.%d %H:%M:%S") + ": when timesleep exception -- " + str(e)
-                    pass
-                else:
-                    pass
+                    print(new_content)
                 time.sleep(10)
             else:
                 break
