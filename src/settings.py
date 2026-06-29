@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass, field, fields
 
 @dataclass
 class ProfileId:
-    profile_id: int = 0
+    profile_id: str = ""
     profile_name: str = ""
     
 

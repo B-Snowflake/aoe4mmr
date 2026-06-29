@@ -4,6 +4,7 @@
 # LastEditTime: 2026/5/25 03:36:13
 
 import ctypes
+from ctypes import wintypes
 from itertools import zip_longest
 import os
 from queue import Queue
@@ -316,37 +317,65 @@ class Aoe4mmr:
         
     @staticmethod
     def check_process(process_name='RelicCardinal.exe'):
-        # 检查游戏是否已经运行
-        """Windows API"""
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        kernel32 = ctypes.WinDLL('kernel32')
-        # 创建进程快照
-        hSnapshot = kernel32.CreateToolhelp32Snapshot(2, 0)  # TH32CS_SNAPPROCESS
-        class PROCESSENTRY32(ctypes.Structure):
+        """检查指定进程是否存在（Unicode API）"""
+        TH32CS_SNAPPROCESS = 0x00000002
+        INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+        class PROCESSENTRY32W(ctypes.Structure):
             _fields_ = [
-                ('dwSize', ctypes.c_ulong),
-                ('cntUsage', ctypes.c_ulong),
-                ('th32ProcessID', ctypes.c_ulong),
-                ('th32DefaultHeapID', ctypes.c_void_p),
-                ('th32ModuleID', ctypes.c_ulong),
-                ('cntThreads', ctypes.c_ulong),
-                ('th32ParentProcessID', ctypes.c_ulong),
-                ('pcPriClassBase', ctypes.c_long),
-                ('dwFlags', ctypes.c_ulong),
-                ('szExeFile', ctypes.c_char * 260)
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.c_void_p),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", ctypes.c_long),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", ctypes.c_wchar * wintypes.MAX_PATH),
             ]
-        pe32 = PROCESSENTRY32()
-        pe32.dwSize = ctypes.sizeof(PROCESSENTRY32)
-        if kernel32.Process32First(hSnapshot, ctypes.byref(pe32)):
+        # 指定函数签名
+
+        kernel32.CreateToolhelp32Snapshot.argtypes = [
+            wintypes.DWORD,
+            wintypes.DWORD,
+        ]
+        kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        kernel32.Process32FirstW.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(PROCESSENTRY32W),
+        ]
+        kernel32.Process32FirstW.restype = wintypes.BOOL
+        kernel32.Process32NextW.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(PROCESSENTRY32W),
+        ]
+        kernel32.Process32NextW.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        # 创建进程快照
+        hSnapshot = kernel32.CreateToolhelp32Snapshot(
+            TH32CS_SNAPPROCESS,
+            0,
+        )
+        if hSnapshot == INVALID_HANDLE_VALUE:
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            pe32 = PROCESSENTRY32W()
+            pe32.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+            if not kernel32.Process32FirstW(hSnapshot, ctypes.byref(pe32)):
+                return False
+            process_name = process_name.lower()
             while True:
-                if pe32.szExeFile.decode().lower() == process_name.lower():
-                    kernel32.CloseHandle(hSnapshot)
+                if pe32.szExeFile.lower() == process_name:
                     return True
-                if not kernel32.Process32Next(hSnapshot, ctypes.byref(pe32)):
+                if not kernel32.Process32NextW(hSnapshot, ctypes.byref(pe32)):
                     break
-        kernel32.CloseHandle(hSnapshot)
-        return False
-    
+            return False
+        finally:
+            kernel32.CloseHandle(hSnapshot)
+
     @staticmethod
     def get_process_name_by_pid(pid):
         # 定义常量

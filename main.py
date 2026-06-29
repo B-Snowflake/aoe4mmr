@@ -10,12 +10,12 @@ import threading
 from pathlib import Path
 import traceback
 from src.aoe4mmr import Aoe4mmr, MouseFilter
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QStandardPaths, Qt
 from PySide6.QtWidgets import QApplication
 
 
 app_name = "Aoe4mmr"
-base_path = Path(QStandardPaths.writableLocation(QStandardPaths.GenericDataLocation)) / app_name
+base_path = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.GenericDataLocation)) / app_name
 if not base_path.exists():
     os.makedirs(base_path, exist_ok=True)
 log_path = base_path / "error.log"
@@ -55,6 +55,7 @@ if __name__ == "__main__":
     # 仅单实例运行，启动时校验实例是否已经运行
     if Aoe4mmr.is_process_running(pid_path):
         app = QApplication(sys.argv)
+        app.styleHints().setColorScheme(Qt.ColorScheme.Light)
         window = Aoe4mmr(base_path, pid_path, app_name)
         mouse_filter = MouseFilter()
         mouse_filter.backward_forward_signal.connect(window.backward_forward)

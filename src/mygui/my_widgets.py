@@ -17,6 +17,7 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from collections import defaultdict
 
+from traitlets import ObjectName
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -79,9 +80,9 @@ class MenuPage(QStackedWidget):
     def __init__(self, add_new_account_signal, settings_changed_signal, max_show_gamehistory, max_accounts, 
                  picked_profile_id, civilization_icon_dic, map_dic, database_queue, player_mark_dic, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.home_page = QWidget()
-        self.new_page = QWidget()
-        self.applyed_player_info = None
+        self.home_page = QWidget(self)
+        self.new_page = QWidget(self)
+        self.applied_player_info = None
         self.civilization_icon_dic = civilization_icon_dic
         self.player_mark_dic = player_mark_dic
         self.max_accounts = max_accounts
@@ -94,6 +95,7 @@ class MenuPage(QStackedWidget):
         self.addWidget(self.new_page)  
         self.set_home_page()
         self.set_new_page()
+        self.set_mark_widget()
         self.search_player_details = PlayerDetail(self.detail_signal, self.add_new_game_history_signal)
         self.add_new_game_history_signal.connect(self.add_new_game_history)
         self.mark_signal.connect(self.mark_player)
@@ -104,15 +106,51 @@ class MenuPage(QStackedWidget):
     
     def apply_player_details(self, player_info):
         profile_id, profile_name = player_info
-        self.applyed_player_info = player_info
+        self.applied_player_info = player_info
         self.search_player_details.get_detail(profile_id)
-    
+
+    def set_mark_widget(self):
+        self.mark_widget = QWidget(parent=self.new_page, ObjectName="mark_widget")
+        # self.mark_widget.setStyleSheet("background-color: rgb(0, 0, 0);")
+        self.mark_widget_layout = QFormLayout(self.mark_widget)
+        self.mark_widget_flag_combobox_label = QLabel(parent=self.mark_widget, text="标记：")
+        self.mark_widget_flag_combobox = QComboBox(self.mark_widget)
+        self.mark_widget_flag_combobox.addItem(QIcon(":images/icons/noob.png"), '坑')
+        self.mark_widget_flag_combobox.addItem(QIcon(":images/icons/carry.png"), '神')
+        self.mark_widget_flag_combobox.addItem(QIcon(":images/icons/hacker.png"), '挂')
+        self.mark_widget_reason_label = QLabel(parent=self.mark_widget, text="备注：")
+        self.mark_widget_reason_textedit = QPlainTextEdit(self.mark_widget)
+        self.mark_widget_reason_textedit.setMinimumHeight(100)
+        self.mark_widget_pushbutton_widget = QWidget(parent=self.mark_widget)
+        self.mark_widget_pushbutton_widget_layout = QHBoxLayout(self.mark_widget_pushbutton_widget)
+        self.mark_widget_confirm_pushbutton = QPushButton(parent=self.mark_widget, text="确定")
+        self.mark_widget_confirm_pushbutton.clicked.connect(lambda: self.mark_player((self.applied_player_info[0],
+                                                                                      self.mark_widget_flag_combobox.currentIndex(),
+                                                                                      self.mark_widget_reason_textedit.toPlainText())))
+        self.mark_widget_confirm_pushbutton.setMinimumWidth(100)
+        self.mark_widget_cancle_pushbutton = QPushButton(parent=self.mark_widget, text="取消")
+        self.mark_widget_cancle_pushbutton.clicked.connect(self.mark_widget.hide)
+        self.mark_widget_cancle_pushbutton.setMinimumWidth(100)
+        self.mark_widget_pushbutton_widget_layout.addStretch(1)
+        self.mark_widget_pushbutton_widget_layout.addWidget(self.mark_widget_confirm_pushbutton)
+        self.mark_widget_pushbutton_widget_layout.addWidget(self.mark_widget_cancle_pushbutton)
+        self.mark_widget_pushbutton_widget_layout.addStretch(1)
+
+        self.mark_widget_layout.addRow(self.mark_widget_flag_combobox_label, self.mark_widget_flag_combobox)
+        self.mark_widget_layout.addRow(self.mark_widget_reason_label, self.mark_widget_reason_textedit)
+        self.mark_widget_layout.addRow(self.mark_widget_pushbutton_widget)
+        self.mark_widget.hide()
+
+    def show_mark_widget(self):
+        self.mark_widget.setGeometry(int(self.new_page.size().width() / 2) - 175, int(self.new_page.size().height() / 2) - 100, 350, 200)
+        self.mark_widget.show()
+
     def mark_player(self, data):
         profile_id, flag, reason = data
         create_time = int(time.time())
         self.player_mark_dic[profile_id] = (flag, reason, create_time)
-        sql = """INSERT INTO player_mark (profile_id, flag, reason, create_time) VALUES (?, ?, ?, ?) ON CONFLICT(profile_id) 
-        DO UPDATE SET flag = excluded.flag, reason = excluded.reason"""
+        sql = ("INSERT INTO player_mark (profile_id, flag, reason, create_time) VALUES (?, ?, ?, ?) ON CONFLICT(profile_id) "
+               "DO UPDATE SET flag = excluded.flag, reason = excluded.reason")
         self.database_queue.put((sql, (profile_id, flag, reason, create_time)))
     
     def reload_player_details(self, data):
@@ -214,6 +252,12 @@ class MenuPage(QStackedWidget):
         add_data_to_table(rm_elo_data, self.player_detail_rank_matchmaking_widget_table)
         self.player_detail_rank_matchmaking_widget.show()
         self.add_new_account_button.show() if self.search_completer.text() and self.player_account_widget_combobox.count() < self.max_accounts else self.add_new_account_button.hide()
+        if self.add_new_account_button.isVisible():
+            self.player_detail_icon_widget_player_mark_pushbutton.hide()
+        elif not self.add_new_account_button.isVisible() and self.player_account_widget_combobox.findData(self.applied_player_info[0]) == -1:
+            self.player_detail_icon_widget_player_mark_pushbutton.show()
+        else:
+            self.player_detail_icon_widget_player_mark_pushbutton.hide()
         
     def add_new_game_history(self, data_list):
         self.player_account_widget_combobox.setEnabled(True)
@@ -289,9 +333,9 @@ class MenuPage(QStackedWidget):
             self.player_account_widget_combobox.addItem(profile_name, profile_id)
         self.player_account_widget_combobox.setCurrentIndex(-1)
         self.player_account_widget_combobox.blockSignals(False)
-        picked_profile_id = self.applyed_player_info[0] if self.applyed_player_info else self.picked_profile_id
+        picked_profile_id = self.applied_player_info[0] if self.applied_player_info else self.picked_profile_id
         self.player_account_widget_combobox.setCurrentIndex(self.set_by_data(self.player_account_widget_combobox, picked_profile_id))
-        self.applyed_player_info = None
+        self.applied_player_info = None
             
     def set_new_page(self):
         
@@ -316,9 +360,16 @@ class MenuPage(QStackedWidget):
             self.player_detail_icon_widget_country_layout.addWidget(self.player_detail_icon_widget_player_name)
             self.player_detail_icon_widget_country_layout.addStretch(1)
             self.player_detail_icon_widget_country_layout.addWidget(self.player_detail_icon_widget_country_icon)
-             
+
+            self.player_detail_icon_widget_player_mark_pushbutton = QPushButton(self.player_detail_widget, text="标记该玩家")
+            self.player_detail_icon_widget_player_mark_pushbutton.setMaximumWidth(100)
+            self.player_detail_icon_widget_player_mark_pushbutton.setMinimumHeight(30)
+            self.player_detail_icon_widget_player_mark_pushbutton.clicked.connect(self.show_mark_widget)
+            self.player_detail_icon_widget_player_mark_pushbutton.hide()
+
             self.player_detail_icon_widget_layout.addWidget(self.player_detail_icon)
             self.player_detail_icon_widget_layout.addLayout(self.player_detail_icon_widget_country_layout)
+            self.player_detail_icon_widget_layout.addWidget(self.player_detail_icon_widget_player_mark_pushbutton, alignment=Qt.AlignmentFlag.AlignTop)
             
         def set_player_deatil_solo_rank_widget():
             self.player_detail_solo_rank_widget = QWidget(parent=self.player_detail_widget, ObjectName="player_detail_solo_rank_widget")
@@ -429,8 +480,8 @@ class MenuPage(QStackedWidget):
         self.new_page_layout.addLayout(self.player_detail_button_layout)
     
     def add_new_account(self):
-        if self.applyed_player_info:
-            self.add_new_account_signal.emit(self.applyed_player_info)
+        if self.applied_player_info:
+            self.add_new_account_signal.emit(self.applied_player_info)
         
 class SearchCompleter(QLineEdit):
     # 使用Listview和linedit编写的自定义搜索框，类似百度的效果
@@ -619,13 +670,13 @@ class PlayerDetail:
                     teams = game['teams']
                     for team in teams:
                         for player in team:
-                            player_profile_id = player['player']['profile_id']
+                            player_profile_id = str(player['player']['profile_id'])
                             player_name = player['player']['name']
                             player_mmr = str(player['player']['rating']) if player['player']['rating'] else '--'
                             civilization = player['player']['civilization']
                             win_rate = '0%'
                             kind = kind
-                            if player_profile_id == int(profile_id):
+                            if player_profile_id == profile_id:
                                 rating_diff = player['player']['rating_diff']
                                 result = player['player']['result']
                             player_data.append((player_name, civilization, player_profile_id, player_mmr, win_rate, kind))

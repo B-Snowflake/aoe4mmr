@@ -36,10 +36,12 @@ class MyWindow(QMainWindow):
         self.dragging, self.location, self.resize_dragging, self.edge_size = False, None, False, 8
         self.setWindowTitle('Aoe4Mmr')
 
+        self.civilization_icon_dic = civilization_icon_dic
         self.database_queue = database_queue
         self.player_mark_dic = player_mark_dic
         self.settings = settings
         self.mouse = Controller()
+        self.map_dic = map_dic
         self.cursor_signal.connect(self.set_resize_cursor)
         self.gui_reload_signal.connect(self.gui_reload)
         self.keyboard_single.connect(self.on_hotkey_changed)
@@ -50,8 +52,8 @@ class MyWindow(QMainWindow):
         self.new_version_signal.connect(self.on_new_version_founded)
         self.toggle_window_signal.connect(self.toggle_window)
         self.menu_page = my_widgets.MenuPage(self.add_new_account_signal, self.settings_changed_signal, self.settings.max_show_gamehistory, 
-                                             self.settings.max_accounts, self.settings.picked_profile_id, civilization_icon_dic, 
-                                             map_dic, database_queue, player_mark_dic, parent=self, ObjectName="menu_page")
+                                             self.settings.max_accounts, self.settings.picked_profile_id, self.civilization_icon_dic,
+                                             self.map_dic, self.database_queue, self.player_mark_dic, parent=self, ObjectName="menu_page")
         self.menu_page.apply_signal.connect(self.apply_new)
         self.left_menu = my_widgets.LeftMenu(parent=self, pages=self.menu_page)
         
@@ -98,16 +100,11 @@ class MyWindow(QMainWindow):
         self.body_layout.addWidget(self.left_menu)
         self.body_layout.addWidget(self.menu_page)
         self.set_setting_page()
-        try:    
-            import debugpy
-            if not debugpy.is_client_connected():
-                threading.Thread(target=self.mouse_listening, daemon=True).start()
-        except:
-            threading.Thread(target=self.mouse_listening, daemon=True).start()
+        threading.Thread(target=self.mouse_listening, daemon=True).start()
     
     def on_new_version_founded(self):
         msg = CustomMessageBox(parent=self, message="发现新版本，是否下载？")
-        if msg.exec() == QDialog.Accepted:
+        if msg.exec() == QDialog.DialogCode.Accepted:
             QDesktopServices.openUrl(QUrl("https://github.com/B-Snowflake/aoe4mmr/releases/latest"))
     
     def toggle_window(self):
@@ -490,6 +487,7 @@ class MmrWindow(QMainWindow):
         self.dragging = False
         self.tracking_id = tracking_id
         self.civilization_icon_dic = civilization_icon_dic
+        self.player_mark_dic = player_mark_dic
         self.rank_icon_dic = rank_icon_dic
         self.enable_dragging = False
         self.resize(965, 190)

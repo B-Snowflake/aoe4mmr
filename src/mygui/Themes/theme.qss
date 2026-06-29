@@ -40,6 +40,11 @@ QWidget#menu_page {
     border: none;
 }
 
+QWidget#mark_widget {
+    background-color: rgb(251, 251, 251);
+    border: none;
+}
+
 QFrame#setting_page_frame {
     background-color: rgb(251, 251, 251);
     border: 2px solid rgb(219, 219, 219);
