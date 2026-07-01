@@ -14,7 +14,7 @@ import keyboard
 from . import data
 from . import data_rc
 from . import settings
-from .mygui import my_window as win
+from src.mygui import my_window as win
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
@@ -47,7 +47,7 @@ class Aoe4mmr:
     def setupUI(self):
         # 设置界面UI
         self.mmr_window = win.MmrWindow(self.settings.picked_profile_id, self.civilization_icon_dic, self.rank_icon_dic, self.settings.window_location, self.player_mark_dic)
-        self.main_window = win.MyWindow(self.settings, self.civilization_icon_dic, self.map_dic, self.database_queue, self.player_mark_dic)
+        self.main_window = win.MyWindow(self.settings, self.civilization_icon_dic, self.map_dic, self.rank_icon_dic, self.database_queue, self.player_mark_dic)
         self.main_window.setWindowIcon(self.app_icon)
         self.main_window.setWindowTitle(self.app_name)
         self.main_window.keyboard_single.connect(self.on_hotkey_changed)
@@ -66,6 +66,9 @@ class Aoe4mmr:
         action1 = QAction("主页", self.mmr_window)
         action2 = QAction("对局", self.mmr_window)
         action3 = QAction("退出", self.mmr_window)
+        action1.setIcon(QPixmap(":/images/icons/cil-home.svg").scaled(18, 18))
+        action2.setIcon(QPixmap(":/images/icons/cil-gamepad.svg").scaled(18, 18))
+        action3.setIcon(QPixmap(":/images/icons/cil-account-logout.svg").scaled(18, 18))
         action1.triggered.connect(lambda: self.toggle_window(window=self.main_window))
         action2.triggered.connect(lambda: self.mmr_window.hide() if self.mmr_window.isVisible() else self.mmr_window.show())
         action3.triggered.connect(self.close)
@@ -86,14 +89,14 @@ class Aoe4mmr:
             self.gui_reload(reason="reload player", data=self.settings.profile_id)        
     
     def backward_forward(self, step):
-        len = self.main_window.left_menu.toolbutton_record.__len__()
+        index_len = self.main_window.left_menu.toolbutton_record.__len__()
         if step == "forward" and self.main_window.left_menu.record_offset_index < 0:        
             self.main_window.left_menu.record_offset_index = self.main_window.left_menu.record_offset_index + 1
-            button = self.main_window.left_menu.toolbutton_record[len+self.main_window.left_menu.record_offset_index-1]
+            button = self.main_window.left_menu.toolbutton_record[index_len+self.main_window.left_menu.record_offset_index-1]
             self.main_window.left_menu.switch_page(sender=button, no_record=True)
-        elif step == "backward" and abs(self.main_window.left_menu.record_offset_index) < len :  
+        elif step == "backward" and abs(self.main_window.left_menu.record_offset_index) < index_len :
             self.main_window.left_menu.record_offset_index = self.main_window.left_menu.record_offset_index - 1          
-            button = self.main_window.left_menu.toolbutton_record[len+self.main_window.left_menu.record_offset_index-1]
+            button = self.main_window.left_menu.toolbutton_record[index_len+self.main_window.left_menu.record_offset_index-1]
             self.main_window.left_menu.switch_page(sender=button, no_record=True)
     
     def new_version(self, version):
@@ -134,6 +137,14 @@ class Aoe4mmr:
     def load_data_from_user_database(self):
         # 启动时，从数据库读取已保存的游戏对局数据，无数据则跳过
         try:
+            self.cur.execute('select profile_id, flag, reason, create_time from player_mark')
+            player_marks = self.cur.fetchall()
+            for player_mark in player_marks:
+                profile_id, flag, reason, create_time = player_mark
+                self.player_mark_dic[profile_id] = (flag, reason, create_time)
+        except Exception as e:
+            print('error when read player mark data:', e)
+        try:
             self.cur.execute('select game_id from last_game limit 1')
             game_id = self.cur.fetchone()[0]
             self.cur.execute('select count(1) from last_game')
@@ -144,17 +155,12 @@ class Aoe4mmr:
             kind = self.cur.fetchone()[0]
             self.cur.execute('select player, civilization, profile_id, player_mmr, win_rate, kind from last_game order by team, player')
             player_data = self.cur.fetchall()
-            self.cur.execute('select profile_id, flag, reason, create_time from player_mark')
-            player_marks = self.cur.fetchall()
-            for player_mark in player_marks:
-                profile_id, flag, reason, create_time = player_mark
-                self.player_mark_dic[profile_id] = (flag, reason, create_time)
             last_game_data = (map_name, game_id, game_mode, player_data, kind)
             self.gui_reload('reload game', last_game_data)
             self.data.last_game_id = game_id
             QTimer.singleShot(0, self.mmr_window.hide)
         except Exception as e:
-            print(e)
+            print('error when read game data:', e)
     
     def write_to_db(self):
         self.conn, self.cur = self.connect_to_userdb()
@@ -192,7 +198,7 @@ class Aoe4mmr:
                 'create table if not exists last_game (game_id INTEGER NOT NULL, player TEXT, win_rate TEXT, civilization TEXT, map TEXT, profile_id INTEGER,'
                 'player_mmr TEXT, team TEXT, kind Text, PRIMARY KEY (game_id,player))')
             cur.execute('create table if not exists version (name TEXT NOT NULL,version TEXT, PRIMARY KEY (name))')
-            cur.execute('create table if not exists player_mark (profile_id INTEGER NOT NULL, flag INTEGER, reason TEXT, create_time INTEGER, backup1 TEXT, backup2 TEXT, backup3 TEXT, PRIMARY KEY (profile_id))')
+            cur.execute('create table if not exists player_mark (profile_id text NOT NULL, flag INTEGER, reason TEXT, create_time INTEGER, backup1 TEXT, backup2 TEXT, backup3 TEXT, PRIMARY KEY (profile_id))')
             cur.execute("insert into version(name, version) values(?, ?)", ('database', self.database_version))
             conn.commit()
         conn.close()

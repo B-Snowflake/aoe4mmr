@@ -74,17 +74,17 @@ class LeftMenu(QWidget):
 class MenuPage(QStackedWidget):
     detail_signal = Signal(dict)
     apply_signal = Signal(tuple)
-    mark_signal = Signal(tuple)
     add_new_game_history_signal = Signal(list)
     
     def __init__(self, add_new_account_signal, settings_changed_signal, max_show_gamehistory, max_accounts, 
-                 picked_profile_id, civilization_icon_dic, map_dic, database_queue, player_mark_dic, *args, **kwargs):
+                 picked_profile_id, civilization_icon_dic, map_dic, rank_icon_dic, database_queue, player_mark_dic, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.home_page = QWidget(self)
         self.new_page = QWidget(self)
         self.applied_player_info = None
         self.civilization_icon_dic = civilization_icon_dic
         self.player_mark_dic = player_mark_dic
+        self.rank_icon_dic = rank_icon_dic
         self.max_accounts = max_accounts
         self.picked_profile_id = picked_profile_id
         self.settings_changed_signal = settings_changed_signal
@@ -98,7 +98,6 @@ class MenuPage(QStackedWidget):
         self.set_mark_widget()
         self.search_player_details = PlayerDetail(self.detail_signal, self.add_new_game_history_signal)
         self.add_new_game_history_signal.connect(self.add_new_game_history)
-        self.mark_signal.connect(self.mark_player)
         self.detail_signal.connect(self.reload_player_details)
         self.apply_signal.connect(self.apply_player_details)
         self.add_new_account_signal = add_new_account_signal
@@ -111,15 +110,15 @@ class MenuPage(QStackedWidget):
 
     def set_mark_widget(self):
         self.mark_widget = QWidget(parent=self.new_page, ObjectName="mark_widget")
-        # self.mark_widget.setStyleSheet("background-color: rgb(0, 0, 0);")
         self.mark_widget_layout = QFormLayout(self.mark_widget)
+        self.mark_widget_layout.setContentsMargins(15, 25, 15, 5)
         self.mark_widget_flag_combobox_label = QLabel(parent=self.mark_widget, text="标记：")
         self.mark_widget_flag_combobox = QComboBox(self.mark_widget)
-        self.mark_widget_flag_combobox.addItem(QIcon(":images/icons/noob.png"), '坑')
-        self.mark_widget_flag_combobox.addItem(QIcon(":images/icons/carry.png"), '神')
-        self.mark_widget_flag_combobox.addItem(QIcon(":images/icons/hacker.png"), '挂')
+        self.mark_widget_flag_combobox.addItem(QIcon(":images/icons/noob.png"), '天坑')
+        self.mark_widget_flag_combobox.addItem(QIcon(":images/icons/carry.png"), '大腿')
+        self.mark_widget_flag_combobox.addItem(QIcon(":images/icons/hacker.png"), '外挂')
         self.mark_widget_reason_label = QLabel(parent=self.mark_widget, text="备注：")
-        self.mark_widget_reason_textedit = QPlainTextEdit(self.mark_widget)
+        self.mark_widget_reason_textedit = LimitedPlainTextEdit(parent=self.mark_widget)
         self.mark_widget_reason_textedit.setMinimumHeight(100)
         self.mark_widget_pushbutton_widget = QWidget(parent=self.mark_widget)
         self.mark_widget_pushbutton_widget_layout = QHBoxLayout(self.mark_widget_pushbutton_widget)
@@ -142,8 +141,24 @@ class MenuPage(QStackedWidget):
         self.mark_widget.hide()
 
     def show_mark_widget(self):
+        if self.applied_player_info[0] in self.player_mark_dic.keys():
+            self.mark_widget_flag_combobox.setCurrentIndex(self.player_mark_dic[self.applied_player_info[0]][0])
+            self.mark_widget_reason_textedit.setPlainText(self.player_mark_dic[self.applied_player_info[0]][1])
+        else:
+            self.mark_widget_flag_combobox.setCurrentIndex(-1)
+            self.mark_widget_reason_textedit.setPlainText("")
         self.mark_widget.setGeometry(int(self.new_page.size().width() / 2) - 175, int(self.new_page.size().height() / 2) - 100, 350, 200)
         self.mark_widget.show()
+
+    def refresh_player_mark(self, mark_profile_id, flag, reason):
+        self.player_detail_icon_widget_player_mark_combobox.setCurrentIndex(flag)
+        self.player_detail_icon_widget_player_mark_label.setText(reason)
+        self.player_detail_icon_widget_player_mark_combobox.show()
+        self.player_detail_icon_widget_player_mark_label.show()
+        for game_history_widget in self.game_history_widgets_collection.values():
+            for profile_id, player_widgets in game_history_widget.widgets_collection.items():
+                if profile_id == mark_profile_id:
+                    game_history_widget.set_player_mark(mark_profile_id, flag, reason)
 
     def mark_player(self, data):
         profile_id, flag, reason = data
@@ -152,6 +167,8 @@ class MenuPage(QStackedWidget):
         sql = ("INSERT INTO player_mark (profile_id, flag, reason, create_time) VALUES (?, ?, ?, ?) ON CONFLICT(profile_id) "
                "DO UPDATE SET flag = excluded.flag, reason = excluded.reason")
         self.database_queue.put((sql, (profile_id, flag, reason, create_time)))
+        self.refresh_player_mark(profile_id, flag, reason)
+        self.mark_widget.hide()
     
     def reload_player_details(self, data):
         def add_data_to_table(data_list, tablewidget):
@@ -256,6 +273,16 @@ class MenuPage(QStackedWidget):
             self.player_detail_icon_widget_player_mark_pushbutton.hide()
         elif not self.add_new_account_button.isVisible() and self.player_account_widget_combobox.findData(self.applied_player_info[0]) == -1:
             self.player_detail_icon_widget_player_mark_pushbutton.show()
+            if self.applied_player_info and self.applied_player_info[0] in self.player_mark_dic.keys():
+                self.player_detail_icon_widget_player_mark_pushbutton.setText("重新标记")
+                self.player_detail_icon_widget_player_mark_label.setText(self.player_mark_dic[self.applied_player_info[0]][1])
+                self.player_detail_icon_widget_player_mark_combobox.setCurrentIndex(self.player_mark_dic[self.applied_player_info[0]][0])
+                self.player_detail_icon_widget_player_mark_label.show()
+                self.player_detail_icon_widget_player_mark_combobox.show()
+            else:
+                self.player_detail_icon_widget_player_mark_pushbutton.setText("标记该玩家")
+                self.player_detail_icon_widget_player_mark_label.hide()
+                self.player_detail_icon_widget_player_mark_combobox.hide()
         else:
             self.player_detail_icon_widget_player_mark_pushbutton.hide()
         
@@ -264,7 +291,7 @@ class MenuPage(QStackedWidget):
         for data in data_list[0:self.max_show_gamehistory]:
             if data[1] in self.game_history_widgets_collection.keys():
                 self.game_history_widgets_collection[data[1]].deleteLater()
-            game_history_widgets = GameHistoryWidget(self.civilization_icon_dic, self.map_dic, data, self.apply_signal, self.mark_signal, self.player_mark_dic, parent=self.player_game_history_widget)
+            game_history_widgets = GameHistoryWidget(self.civilization_icon_dic, self.map_dic, self.rank_icon_dic, data, self.apply_signal, self.player_mark_dic, parent=self.player_game_history_widget)
             game_id = game_history_widgets.game_id
             self.game_history_widgets_collection[game_id] = game_history_widgets
             self.player_game_history_widget_layout.addWidget(game_history_widgets)
@@ -303,7 +330,7 @@ class MenuPage(QStackedWidget):
         self.player_game_history_widget = QWidget(self.home_page)
    
         self.player_game_history_widget_scrollarea.setWidgetResizable(True)
-        self.player_game_history_widget_scrollarea.setFrameShape(QFrame.NoFrame)
+        self.player_game_history_widget_scrollarea.setFrameShape(QFrame.Shape.NoFrame)
         self.player_game_history_widget_layout = QVBoxLayout(self.player_game_history_widget) 
         self.player_game_history_widget_layout.setContentsMargins(0, 0, 0, 0)
         self.player_game_history_widget_layout.setSpacing(30)
@@ -361,15 +388,28 @@ class MenuPage(QStackedWidget):
             self.player_detail_icon_widget_country_layout.addStretch(1)
             self.player_detail_icon_widget_country_layout.addWidget(self.player_detail_icon_widget_country_icon)
 
-            self.player_detail_icon_widget_player_mark_pushbutton = QPushButton(self.player_detail_widget, text="标记该玩家")
-            self.player_detail_icon_widget_player_mark_pushbutton.setMaximumWidth(100)
-            self.player_detail_icon_widget_player_mark_pushbutton.setMinimumHeight(30)
-            self.player_detail_icon_widget_player_mark_pushbutton.clicked.connect(self.show_mark_widget)
-            self.player_detail_icon_widget_player_mark_pushbutton.hide()
+            self.player_detail_icon_widget_player_mark_widget = QWidget(self.player_detail_widget)
+            self.player_detail_icon_widget_player_mark_widget.setFixedSize(250, 80)
+            self.player_detail_icon_widget_player_mark_layout = QVBoxLayout(self.player_detail_icon_widget_player_mark_widget)
+            self.player_detail_icon_widget_player_mark_layout.setContentsMargins(0, 0, 0, 0)
+            self.player_detail_icon_widget_player_mark_label_layout = QHBoxLayout()
+            self.player_detail_icon_widget_player_mark_label_layout.setContentsMargins(0, 0, 0, 0)
+            self.player_detail_icon_widget_player_mark_combobox = QComboBox(parent=self.player_detail_widget, ObjectName="player_mark_combobox")
+            self.player_detail_icon_widget_player_mark_combobox.setFixedSize(22, 22)
+            self.player_detail_icon_widget_player_mark_combobox.addItem(QIcon(":images/icons/noob.png"), '')
+            self.player_detail_icon_widget_player_mark_combobox.addItem(QIcon(":images/icons/carry.png"), '')
+            self.player_detail_icon_widget_player_mark_combobox.addItem(QIcon(":images/icons/hacker.png"), '')
+            self.player_detail_icon_widget_player_mark_combobox.hide()
+            self.player_detail_icon_widget_player_mark_label = QLabel(self.player_detail_widget)
+            self.player_detail_icon_widget_player_mark_label.setWordWrap(True)
+            self.player_detail_icon_widget_player_mark_label_layout.addWidget(self.player_detail_icon_widget_player_mark_combobox, alignment=Qt.AlignmentFlag.AlignTop)
+            self.player_detail_icon_widget_player_mark_label_layout.addWidget(self.player_detail_icon_widget_player_mark_label)
+            self.player_detail_icon_widget_player_mark_layout.addLayout(self.player_detail_icon_widget_player_mark_label_layout)
+            self.player_detail_icon_widget_player_mark_layout.addStretch(1)
 
             self.player_detail_icon_widget_layout.addWidget(self.player_detail_icon)
             self.player_detail_icon_widget_layout.addLayout(self.player_detail_icon_widget_country_layout)
-            self.player_detail_icon_widget_layout.addWidget(self.player_detail_icon_widget_player_mark_pushbutton, alignment=Qt.AlignmentFlag.AlignTop)
+            self.player_detail_icon_widget_layout.addWidget(self.player_detail_icon_widget_player_mark_widget)
             
         def set_player_deatil_solo_rank_widget():
             self.player_detail_solo_rank_widget = QWidget(parent=self.player_detail_widget, ObjectName="player_detail_solo_rank_widget")
@@ -377,7 +417,7 @@ class MenuPage(QStackedWidget):
             self.player_detail_solo_rank_widget_layout = QVBoxLayout(self.player_detail_solo_rank_widget)
             self.player_detail_solo_rank_widget_layout.setSpacing(10)
             self.player_detail_solo_rank_widget_label = QLabel(parent=self.player_detail_solo_rank_widget, text="单人排名", ObjectName="player_detail_solo_rank_widget_label")
-            self.player_detail_solo_rank_widget_table = QTableWidget(self.player_detail_solo_rank_widget, ObjectName="player_detail_solo_rank_widget_table")
+            self.player_detail_solo_rank_widget_table = QTableWidget(parent=self.player_detail_solo_rank_widget, ObjectName="player_detail_solo_rank_widget_table")
             self.player_detail_solo_rank_widget_table.verticalHeader().setVisible(False)
             self.player_detail_solo_rank_widget_table.setFrameShape(QFrame.NoFrame)
             self.player_detail_solo_rank_widget_table.setShowGrid(False)
@@ -394,12 +434,12 @@ class MenuPage(QStackedWidget):
             self.player_detail_tm_rank_widget_layout = QVBoxLayout(self.player_detail_tm_rank_widget)
             self.player_detail_tm_rank_widget_layout.setSpacing(10)
             self.player_detail_tm_rank_widget_label = QLabel(parent=self.player_detail_tm_rank_widget, text="组队排名", ObjectName="player_detail_tm_rank_widget_label")
-            self.player_detail_tm_rank_widget_table = QTableWidget(self.player_detail_tm_rank_widget, ObjectName="player_detail_tm_rank_widget_table")
+            self.player_detail_tm_rank_widget_table = QTableWidget(parent=self.player_detail_tm_rank_widget, ObjectName="player_detail_tm_rank_widget_table")
             self.player_detail_tm_rank_widget_table.verticalHeader().setVisible(False)
-            self.player_detail_tm_rank_widget_table.setFrameShape(QFrame.NoFrame)
+            self.player_detail_tm_rank_widget_table.setFrameShape(QFrame.Shape.NoFrame)
             self.player_detail_tm_rank_widget_table.setShowGrid(False)
             self.player_detail_tm_rank_widget_table.setColumnCount(3)
-            self.player_detail_tm_rank_widget_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.player_detail_tm_rank_widget_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
             self.player_detail_tm_rank_widget_table.setHorizontalHeaderLabels(["赛季", "分值", "胜率"])
             
             self.player_detail_tm_rank_widget_layout.addWidget(self.player_detail_tm_rank_widget_label)
@@ -411,12 +451,12 @@ class MenuPage(QStackedWidget):
             self.player_detail_qm_widget_layout = QVBoxLayout(self.player_detail_qm_widget)
             self.player_detail_qm_widget_layout.setSpacing(10)
             self.player_detail_qm_widget_label = QLabel(parent=self.player_detail_qm_widget, text="快速比赛", ObjectName="player_detail_qm_widget_label")
-            self.player_detail_qm_widget_table = QTableWidget(self.player_detail_qm_widget, ObjectName="player_detail_qm_widget_table")
+            self.player_detail_qm_widget_table = QTableWidget(parent=self.player_detail_qm_widget, ObjectName="player_detail_qm_widget_table")
             self.player_detail_qm_widget_table.verticalHeader().setVisible(False)
-            self.player_detail_qm_widget_table.setFrameShape(QFrame.NoFrame)
+            self.player_detail_qm_widget_table.setFrameShape(QFrame.Shape.NoFrame)
             self.player_detail_qm_widget_table.setShowGrid(False)
             self.player_detail_qm_widget_table.setColumnCount(3)
-            self.player_detail_qm_widget_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.player_detail_qm_widget_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
             self.player_detail_qm_widget_table.setHorizontalHeaderLabels(["模式", "分值", "胜率"])
             
             self.player_detail_qm_widget_layout.addWidget(self.player_detail_qm_widget_label)
@@ -428,12 +468,12 @@ class MenuPage(QStackedWidget):
             self.player_detail_rank_matchmaking_widget_layout = QVBoxLayout(self.player_detail_rank_matchmaking_widget)
             self.player_detail_qm_widget_layout.setSpacing(10)
             self.player_detail_rank_matchmaking_widget_label = QLabel(parent=self.player_detail_rank_matchmaking_widget, text="排名ELO", ObjectName="player_detail_rank_matchmaking_widget_label")
-            self.player_detail_rank_matchmaking_widget_table = QTableWidget(self.player_detail_rank_matchmaking_widget, ObjectName="player_detail_rank_matchmaking_widget_table")
+            self.player_detail_rank_matchmaking_widget_table = QTableWidget(parent=self.player_detail_rank_matchmaking_widget, ObjectName="player_detail_rank_matchmaking_widget_table")
             self.player_detail_rank_matchmaking_widget_table.verticalHeader().setVisible(False)
-            self.player_detail_rank_matchmaking_widget_table.setFrameShape(QFrame.NoFrame)
+            self.player_detail_rank_matchmaking_widget_table.setFrameShape(QFrame.Shape.NoFrame)
             self.player_detail_rank_matchmaking_widget_table.setShowGrid(False)
             self.player_detail_rank_matchmaking_widget_table.setColumnCount(3)
-            self.player_detail_rank_matchmaking_widget_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            self.player_detail_rank_matchmaking_widget_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
             self.player_detail_rank_matchmaking_widget_table.setHorizontalHeaderLabels(["模式", "ELO", "胜率"])
             
             self.player_detail_rank_matchmaking_widget_layout.addWidget(self.player_detail_rank_matchmaking_widget_label)
@@ -447,6 +487,10 @@ class MenuPage(QStackedWidget):
         self.add_new_account_button.clicked.connect(self.add_new_account)
         self.add_new_account_button.setFixedSize(120, 30)
         self.add_new_account_button.hide()
+        self.player_detail_icon_widget_player_mark_pushbutton = QPushButton(parent=self.player_detail_widget, text="标记该玩家")
+        self.player_detail_icon_widget_player_mark_pushbutton.setFixedSize(120, 30)
+        self.player_detail_icon_widget_player_mark_pushbutton.clicked.connect(self.show_mark_widget)
+        self.player_detail_icon_widget_player_mark_pushbutton.hide()
         self.player_detail_widget_layout = QVBoxLayout(self.player_detail_widget)
         self.player_detail_widget_rank_layout = QHBoxLayout()
         self.player_detail_widget_qm_layout = QHBoxLayout()
@@ -454,6 +498,7 @@ class MenuPage(QStackedWidget):
         self.player_detail_button_layout.addStretch(1)
         self.new_page_layout.setContentsMargins(9, 0, 0, 9)
         self.player_detail_button_layout.addWidget(self.add_new_account_button)
+        self.player_detail_button_layout.addWidget(self.player_detail_icon_widget_player_mark_pushbutton)
         self.player_detail_widget_layout.setContentsMargins(0, 0, 0, 0)
         self.player_detail_widget_layout.setSpacing(0)
         self.player_detail_widget_rank_layout.setContentsMargins(0, 0, 0, 0)
@@ -680,7 +725,7 @@ class PlayerDetail:
                                 rating_diff = player['player']['rating_diff']
                                 result = player['player']['result']
                             player_data.append((player_name, civilization, player_profile_id, player_mmr, win_rate, kind))
-                    game_mode = str(len(player_data))
+                    game_mode = len(player_data)
                     data = (map_name, game_id, game_mode, player_data, kind, rating_diff, result, profile_id)
                     data_list.append(data)
             except Exception as e:
@@ -726,16 +771,15 @@ class PlayerDetail:
             
             
 class GameHistoryWidget(QWidget):
-    
-    
-    def __init__(self, civilization_icon_dic, map_dic, data, apply_signal, mark_signal, player_mark_dic, *args, **kwargs):
+
+    def __init__(self, civilization_icon_dic, map_dic, rank_icon_dic, data, apply_signal, player_mark_dic, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.map_name, self.game_id, self.game_mode, self.player_data, self.kind, self.rating_diff, self.result, self.profile_id = data
         self.civilization_icon_dic = civilization_icon_dic
+        self.rank_icon_dic = rank_icon_dic
         self.player_mark_dic = player_mark_dic
         self.map_dic = map_dic
         self.apply_signal = apply_signal
-        self.mark_signal = mark_signal
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.main_layout.setSpacing(25)
@@ -743,6 +787,7 @@ class GameHistoryWidget(QWidget):
         self.left_side_widget = QWidget(parent=self)
         self.mid_side_widget = QWidget(parent=self)
         self.right_side_widget = QWidget(parent=self)
+        self.set_mmr_rank_map()
         
         self.main_layout.addWidget(self.result_widget)
         self.main_layout.addWidget(self.left_side_widget)
@@ -780,7 +825,7 @@ class GameHistoryWidget(QWidget):
         self.mid_side_widget_layout.setContentsMargins(0, 15, 0, 25)
         self.mid_side_widget.setFixedSize(110, 150)
             
-        self.widgets_collection = []
+        self.widgets_collection = {}
         self.set_mid_side_widget()
         self.set_left_and_right_side_widget()
 
@@ -806,25 +851,25 @@ class GameHistoryWidget(QWidget):
     def on_player_name_clicked(self, player_info):
         self.apply_signal.emit(player_info)
         
-    def on_player_mark_combobox_currentIndexChanged(self):
-        sender = self.sender()
-        sender.effect.setOpacity(1)
-        player_profile_id = sender.profile_id
-        flag = sender.currentIndex()
-        reason = None
-        self.mark_signal.emit((player_profile_id, flag, reason))
-        
     def set_mid_side_widget(self):
-        self.mid_side_widget_map_name_label = QLabel(parent=self.mid_side_widget, text=self.map_dic.get(self.map_name)[0])
-        self.widgets_collection.append(self.mid_side_widget_map_name_label)
+        game_type = '(天梯)' if 'rm' in self.kind else ''
+        self.mid_side_widget_map_name_label = QLabel(parent=self.mid_side_widget, text=f'{self.map_dic.get(self.map_name)[0]}{game_type}')
+        self.widgets_collection['mid_side_map_name'] = self.mid_side_widget_map_name_label
         self.mid_side_widget_layout.addWidget(self.mid_side_widget_map_name_label, alignment=Qt.AlignmentFlag.AlignCenter)
         if self.icon_size:
             self.mid_side_widget_map_icon_label = QLabel(parent=self.mid_side_widget)
             self.mid_side_widget_map_icon_label.setFixedSize(self.icon_size)
-            self.widgets_collection.append(self.mid_side_widget_map_icon_label)
+            self.widgets_collection['mid_side_map_icon'] = self.mid_side_widget_map_icon_label
             self.mid_side_widget_map_icon_label.setPixmap(self.get_map_icon(self.map_name).scaled(self.icon_size))
             self.mid_side_widget_layout.addWidget(self.mid_side_widget_map_icon_label, alignment=Qt.AlignmentFlag.AlignCenter)        
-    
+
+    def set_player_mark(self, profile_id, flag, reason):
+        mark_combobox = self.widgets_collection[profile_id]['mark_combobox']
+        name_label = self.widgets_collection[profile_id]['name_label']
+        mark_combobox.setCurrentIndex(flag)
+        mark_combobox.setToolTip(reason)
+        name_label.setToolTip(reason)
+
     def set_left_and_right_side_widget(self):
 
         def set_result_widget():
@@ -840,27 +885,33 @@ class GameHistoryWidget(QWidget):
             self.result_label.setStyleSheet(style)
 
             if self.rating_diff:
-                if self.rating_diff >= 10:
+                if self.rating_diff > 0:
                     rating_diff_text = f'+{self.rating_diff}'
-                elif 0 <= self.rating_diff < 10:
-                    rating_diff_text = f' +{self.rating_diff}'
-                elif -10 < self.rating_diff < 0:
-                    rating_diff_text = f' {self.rating_diff}'
-                elif self.rating_diff < -10:
+                elif self.rating_diff <= 0:
                     rating_diff_text = f'{self.rating_diff}'
+                else:
+                    rating_diff_text = '--'
             else:
-                rating_diff_text = ' --'
+                rating_diff_text = '--'
             self.rating_diff_label = QLabel(parent=self.result_widget, text=rating_diff_text)
+            self.rating_diff_label.setFixedWidth(25)
             self.rating_diff_label.setStyleSheet(style)
             
             self.result_widget_layout.addWidget(self.result_label, alignment=Qt.AlignmentFlag.AlignHCenter)
             self.result_widget_layout.addWidget(self.rating_diff_label, alignment=Qt.AlignmentFlag.AlignHCenter)
-        
+
         def create_contents(player, profile_id, civilization, player_mmr, side):
-            parent = self.left_side_widget if side=='left' else self.right_side_widget
+            parent = self.left_side_widget if side == 'left' else self.right_side_widget
             layout = QHBoxLayout()
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(5)
+            player_rank_icon_label = QLabel(parent=parent)
+            if 'rm' in self.kind:
+                pixmap = self.get_rank_icon(player_mmr).scaled(QSize(24, 37))
+            else:
+                pixmap = QPixmap(QSize(24, 37))
+                pixmap.fill(Qt.transparent)
+            player_rank_icon_label.setPixmap(pixmap)
             player_name_label = ClickableLabel(id=profile_id, name=player, parent=parent, text=self.islongname(player))         
             player_name_label.setStyleSheet("color: rgb(114, 137, 218)" if self.profile_id == profile_id else "")
             player_name_label.clicked.connect(self.on_player_name_clicked)
@@ -872,20 +923,24 @@ class GameHistoryWidget(QWidget):
             player_mark_combobox.addItem(QIcon(":images/icons/noob.png"), '')
             player_mark_combobox.addItem(QIcon(":images/icons/carry.png"), '')
             player_mark_combobox.addItem(QIcon(":images/icons/hacker.png"), '')
-            if (mark := self.player_mark_dic.get(profile_id)):
+            if mark := self.player_mark_dic.get(profile_id):
                 player_mark_combobox.setCurrentIndex(mark[0])
+                player_mark_combobox.setToolTip(mark[1])
+                player_name_label.setToolTip(mark[1])
             else:
                 player_mark_combobox.setCurrentIndex(-1)
-            player_mark_combobox.currentIndexChanged.connect(self.on_player_mark_combobox_currentIndexChanged)
             player_mmr_label = QLabel(parent=parent, text=player_mmr)
-            self.widgets_collection.append(player_name_label)
-            self.widgets_collection.append(player_civ_label)
-            self.widgets_collection.append(player_mark_combobox)
-            self.widgets_collection.append(player_mmr_label)
-            return layout, player_name_label, player_civ_label, player_mark_combobox, player_mmr_label
+            self.widgets_collection[profile_id] = {}
+            self.widgets_collection[profile_id]['name_label'] = player_name_label
+            self.widgets_collection[profile_id]['civ_label'] = player_civ_label
+            self.widgets_collection[profile_id]['mark_combobox'] = player_mark_combobox
+            self.widgets_collection[profile_id]['mmr_label'] = player_mmr_label
+            return layout, player_rank_icon_label, player_name_label, player_civ_label, player_mark_combobox, player_mmr_label
             
         def add_to_left_side(player, profile_id, civilization, player_mmr):
-            layout, player_name_label, player_civ_label, player_mark_combobox, player_mmr_label = create_contents(player, profile_id, civilization, player_mmr, 'left')
+            layout, player_rank_icon_label, player_name_label, player_civ_label, player_mark_combobox, player_mmr_label = (
+                create_contents(player, profile_id, civilization, player_mmr, 'left'))
+            layout.addWidget(player_rank_icon_label, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(player_civ_label, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(player_name_label, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addStretch(1)
@@ -894,12 +949,14 @@ class GameHistoryWidget(QWidget):
             self.left_side_widget_layout.addLayout(layout)
         
         def add_to_right_side(player, profile_id, civilization, player_mmr):
-            layout, player_name_label, player_civ_label, player_mark_combobox, player_mmr_label = create_contents(player, profile_id, civilization, player_mmr,  'right')
+            layout, player_rank_icon_label, player_name_label, player_civ_label, player_mark_combobox, player_mmr_label = (
+                create_contents(player, profile_id, civilization, player_mmr, 'right'))
             layout.addWidget(player_mmr_label, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(player_mark_combobox, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addStretch(1)
             layout.addWidget(player_name_label, alignment=Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(player_civ_label, alignment=Qt.AlignmentFlag.AlignCenter)
+            layout.addWidget(player_rank_icon_label, alignment=Qt.AlignmentFlag.AlignCenter)
             self.right_side_widget_layout.addLayout(layout)
         
         players_count = len(self.player_data)
@@ -926,7 +983,66 @@ class GameHistoryWidget(QWidget):
         pixmap = QPixmap()
         pixmap.loadFromData(img)
         return pixmap
-    
+
+    def get_rank_icon(self, player_mmr):
+        if self.game_mode > 2:
+            rank_map = self.team_mmr_rank_map
+        else:
+            rank_map = self.solo_mmr_rank_map
+        for threshold, r in rank_map:
+            try:
+                if int(player_mmr) >= threshold:
+                    rank = r
+                    break
+            except Exception as e:
+                rank = 'unranked'
+        img = self.rank_icon_dic.get(rank)
+        pixmap = QPixmap()
+        pixmap.loadFromData(img)
+        return pixmap
+
+    def set_mmr_rank_map(self):
+        # 排位mmr对应段位表
+        self.team_mmr_rank_map = [
+            (1600, 'team_conqueror_3'),
+            (1500, 'team_conqueror_2'),
+            (1400, 'team_conqueror_1'),
+            (1350, 'team_diamond_3'),
+            (1300, 'team_diamond_2'),
+            (1200, 'team_diamond_1'),
+            (1150, 'team_platinum_3'),
+            (1100, 'team_platinum_2'),
+            (1000, 'team_platinum_1'),
+            (900, 'team_gold_3'),
+            (800, 'team_gold_2'),
+            (700, 'team_gold_1'),
+            (650, 'team_silver_3'),
+            (600, 'team_silver_2'),
+            (500, 'team_silver_1'),
+            (450, 'team_bronze_3'),
+            (400, 'team_bronze_2'),
+            (0, 'team_bronze_1')
+        ]
+        self.solo_mmr_rank_map = [
+            (1600, 'solo_conqueror_3'),
+            (1500, 'solo_conqueror_2'),
+            (1400, 'solo_conqueror_1'),
+            (1350, 'solo_diamond_3'),
+            (1300, 'solo_diamond_2'),
+            (1200, 'solo_diamond_1'),
+            (1150, 'solo_platinum_3'),
+            (1100, 'solo_platinum_2'),
+            (1000, 'solo_platinum_1'),
+            (900, 'solo_gold_3'),
+            (800, 'solo_gold_2'),
+            (700, 'solo_gold_1'),
+            (650, 'solo_silver_3'),
+            (600, 'solo_silver_2'),
+            (500, 'solo_silver_1'),
+            (450, 'solo_bronze_3'),
+            (400, 'solo_bronze_2'),
+            (0, 'solo_bronze_1')
+        ]
     
 class ClickableLabel(QLabel):
     clicked = Signal(tuple)
@@ -974,3 +1090,30 @@ class ReadOnlyComboBox(QComboBox):
         if self._locked:
             return
         super().keyPressEvent(e)
+
+
+class LimitedPlainTextEdit(QPlainTextEdit):
+    def __init__(self, max_chars=60, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_chars = max_chars
+
+    def inputMethodEvent(self, event: QInputMethodEvent):
+        current = self.toPlainText()
+        commit_text = event.commitString()  # 中文最终提交内容
+        if len(current) + len(commit_text) > self.max_chars:
+            allowed = self.max_chars - len(current)
+            if allowed <= 0:
+                return
+            # 截断中文提交内容
+            event.setCommitString(commit_text[:allowed])
+        super().inputMethodEvent(event)
+
+    def keyPressEvent(self, event):
+        text = self.toPlainText()
+        # 允许删除键
+        if event.key() in (Qt.Key_Backspace, Qt.Key_Delete):
+            return super().keyPressEvent(event)
+        # 限制长度
+        if len(text) >= self.max_chars:
+            return  # 直接忽略输入
+        super().keyPressEvent(event)

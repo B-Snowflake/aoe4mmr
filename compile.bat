@@ -12,3 +12,5 @@ nuitka ^
 	--windows-console-mode=disable ^
 	main.py
 echo %TIME% & ping -n 2 127.0.0.1 > nul
+
+@REM 	--windows-console-mode=disable ^

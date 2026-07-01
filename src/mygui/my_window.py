@@ -6,7 +6,6 @@
 # Date: 2026/3/21
 
 import re
-import sys
 import threading
 import keyboard
 # noinspection PyPackages
@@ -29,7 +28,7 @@ class MyWindow(QMainWindow):
     keyboard_single = Signal(str)
     new_version_signal = Signal()
 
-    def __init__(self, settings, civilization_icon_dic, map_dic, database_queue, player_mark_dic, *args, **kwargs):
+    def __init__(self, settings, civilization_icon_dic, map_dic, rank_icon_dic, database_queue, player_mark_dic, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
@@ -37,6 +36,7 @@ class MyWindow(QMainWindow):
         self.setWindowTitle('Aoe4Mmr')
 
         self.civilization_icon_dic = civilization_icon_dic
+        self.rank_icon_dic = rank_icon_dic
         self.database_queue = database_queue
         self.player_mark_dic = player_mark_dic
         self.settings = settings
@@ -45,15 +45,15 @@ class MyWindow(QMainWindow):
         self.cursor_signal.connect(self.set_resize_cursor)
         self.gui_reload_signal.connect(self.gui_reload)
         self.keyboard_single.connect(self.on_hotkey_changed)
-        self.set_theme("src/mygui/Themes/theme.qss")
-        # self.set_theme()
+        # self.set_theme("src/mygui/Themes/theme.qss")
+        self.set_theme()
         self.center_widget = QWidget(parent=self, ObjectName="center_widget")
         self.setCentralWidget(self.center_widget)
         self.new_version_signal.connect(self.on_new_version_founded)
         self.toggle_window_signal.connect(self.toggle_window)
         self.menu_page = my_widgets.MenuPage(self.add_new_account_signal, self.settings_changed_signal, self.settings.max_show_gamehistory, 
                                              self.settings.max_accounts, self.settings.picked_profile_id, self.civilization_icon_dic,
-                                             self.map_dic, self.database_queue, self.player_mark_dic, parent=self, ObjectName="menu_page")
+                                             self.map_dic, self.rank_icon_dic, self.database_queue, self.player_mark_dic, parent=self, ObjectName="menu_page")
         self.menu_page.apply_signal.connect(self.apply_new)
         self.left_menu = my_widgets.LeftMenu(parent=self, pages=self.menu_page)
         
@@ -587,6 +587,7 @@ class MmrWindow(QMainWindow):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self.setWindowTitle('Aoe4mmr')
+        self.mark_combobox_dic = {}
         if not self.window_location:
             screen = QApplication.primaryScreen()
             screen_geo = screen.geometry()
@@ -739,11 +740,29 @@ class MmrWindow(QMainWindow):
         self.player4.set_text_color("#CC9F4A")
         self.player4.setAlignment(Qt.AlignmentFlag.AlignTop)
 
+        self.player1mark = QComboBox(parent=self.uiwidget)
+        self.player1mark.hide()
+        self.player1mark.setObjectName('player1_mark')
+        self.player1mark.setGeometry(300, 38, 22, 22)
+        self.player1mark.addItem(QIcon(":images/icons/noob.png"), '')
+        self.player1mark.addItem(QIcon(":images/icons/carry.png"), '')
+        self.player1mark.addItem(QIcon(":images/icons/hacker.png"), '')
+        self.set_combobox_stylesheet(self.player1mark)
+
         self.player1mmr = OutlinedLabel(parent=self.uiwidget)
         self.player1mmr.setObjectName('player1mmr')
         self.player1mmr.set_text_color("#CC9F4A")
         self.player1mmr.setGeometry(330, 38, 120, 30)
         self.player1mmr.setText('1500')
+
+        self.player2mark = QComboBox(parent=self.uiwidget)
+        self.player2mark.hide()
+        self.player2mark.setObjectName('player2_mark')
+        self.player2mark.setGeometry(300, 78, 22, 22)
+        self.player2mark.addItem(QIcon(":images/icons/noob.png"), '')
+        self.player2mark.addItem(QIcon(":images/icons/carry.png"), '')
+        self.player2mark.addItem(QIcon(":images/icons/hacker.png"), '')
+        self.set_combobox_stylesheet(self.player2mark)
 
         self.player2mmr = OutlinedLabel(parent=self.uiwidget)
         self.player2mmr.setObjectName('player2mmr')
@@ -751,11 +770,29 @@ class MmrWindow(QMainWindow):
         self.player2mmr.setGeometry(330, 78, 120, 30)
         self.player2mmr.setText('1500')
 
+        self.player3mark = QComboBox(parent=self.uiwidget)
+        self.player3mark.hide()
+        self.player3mark.setObjectName('player3_mark')
+        self.player3mark.setGeometry(300, 118, 22, 22)
+        self.player3mark.addItem(QIcon(":images/icons/noob.png"), '')
+        self.player3mark.addItem(QIcon(":images/icons/carry.png"), '')
+        self.player3mark.addItem(QIcon(":images/icons/hacker.png"), '')
+        self.set_combobox_stylesheet(self.player3mark)
+
         self.player3mmr = OutlinedLabel(parent=self.uiwidget)
         self.player3mmr.setObjectName('player3mmr')
         self.player3mmr.set_text_color("#CC9F4A")
         self.player3mmr.setGeometry(330, 118, 120, 30)
         self.player3mmr.setText('1500')
+
+        self.player4mark = QComboBox(parent=self.uiwidget)
+        self.player4mark.hide()
+        self.player4mark.setObjectName('player4_mark')
+        self.player4mark.setGeometry(300, 158, 22, 22)
+        self.player4mark.addItem(QIcon(":images/icons/noob.png"), '')
+        self.player4mark.addItem(QIcon(":images/icons/carry.png"), '')
+        self.player4mark.addItem(QIcon(":images/icons/hacker.png"), '')
+        self.set_combobox_stylesheet(self.player4mark)
 
         self.player4mmr = OutlinedLabel(parent=self.uiwidget)
         self.player4mmr.setObjectName('player4mmr')
@@ -791,12 +828,30 @@ class MmrWindow(QMainWindow):
         self.player8.setText('player8')
         self.player8.set_text_color("#CC9F4A")
 
+        self.player5mark = QComboBox(parent=self.uiwidget)
+        self.player5mark.hide()
+        self.player5mark.setObjectName('player5_mark')
+        self.player5mark.setGeometry(640, 38, 22, 22)
+        self.player5mark.addItem(QIcon(":images/icons/noob.png"), '')
+        self.player5mark.addItem(QIcon(":images/icons/carry.png"), '')
+        self.player5mark.addItem(QIcon(":images/icons/hacker.png"), '')
+        self.set_combobox_stylesheet(self.player5mark)
+
         self.player5mmr = OutlinedLabel(parent=self.uiwidget)
         self.player5mmr.setObjectName('player5mmr')
         self.player5mmr.setGeometry(510, 38, 120, 30)
         self.player5mmr.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.player5mmr.setText('1500')
         self.player5mmr.set_text_color("#CC9F4A")
+
+        self.player6mark = QComboBox(parent=self.uiwidget)
+        self.player6mark.hide()
+        self.player6mark.setObjectName('player6_mark')
+        self.player6mark.setGeometry(640, 78, 22, 22)
+        self.player6mark.addItem(QIcon(":images/icons/noob.png"), '')
+        self.player6mark.addItem(QIcon(":images/icons/carry.png"), '')
+        self.player6mark.addItem(QIcon(":images/icons/hacker.png"), '')
+        self.set_combobox_stylesheet(self.player6mark)
 
         self.player6mmr = OutlinedLabel(parent=self.uiwidget)
         self.player6mmr.setObjectName('player6mmr')
@@ -805,12 +860,30 @@ class MmrWindow(QMainWindow):
         self.player6mmr.setText('1500')
         self.player6mmr.set_text_color("#CC9F4A")
 
+        self.player7mark = QComboBox(parent=self.uiwidget)
+        self.player7mark.hide()
+        self.player7mark.setObjectName('player7_mark')
+        self.player7mark.setGeometry(640, 118, 22, 22)
+        self.player7mark.addItem(QIcon(":images/icons/noob.png"), '')
+        self.player7mark.addItem(QIcon(":images/icons/carry.png"), '')
+        self.player7mark.addItem(QIcon(":images/icons/hacker.png"), '')
+        self.set_combobox_stylesheet(self.player7mark)
+
         self.player7mmr = OutlinedLabel(parent=self.uiwidget)
         self.player7mmr.setObjectName('player7mmr')
         self.player7mmr.setGeometry(510, 118, 120, 30)
         self.player7mmr.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.player7mmr.setText('1500')
         self.player7mmr.set_text_color("#CC9F4A")
+
+        self.player8mark = QComboBox(parent=self.uiwidget)
+        self.player8mark.hide()
+        self.player8mark.setObjectName('player8_mark')
+        self.player8mark.setGeometry(640, 158, 22, 22)
+        self.player8mark.addItem(QIcon(":images/icons/noob.png"), '')
+        self.player8mark.addItem(QIcon(":images/icons/carry.png"), '')
+        self.player8mark.addItem(QIcon(":images/icons/hacker.png"), '')
+        self.set_combobox_stylesheet(self.player8mark)
 
         self.player8mmr = OutlinedLabel(parent=self.uiwidget)
         self.player8mmr.setObjectName('player8mmr')
@@ -841,11 +914,42 @@ class MmrWindow(QMainWindow):
             except:
                 return str(player_mmr) + " " * 14 + str(win_rate)
 
+    def set_combobox_stylesheet(self, combobox):
+        combobox.setStyleSheet(
+        """
+            QComboBox {
+                background-color: transparent;
+                border: none;
+                padding: 0px;
+            }
+            
+            QComboBox::down-arrow {
+                image: none;
+                width: 0px;
+            }
+            
+            QComboBox::drop-down {
+                width: 0px;
+                border: none;
+            }
+        """)
+
+    def player_mark_reload(self):
+        mark_combobox_list = [values for key, values in self.mark_combobox_dic.items()]
+        for profile_id, values in self.player_mark_dic.items():
+            if combobox:= self.mark_combobox_dic.get(profile_id):
+                combobox.setCurrentIndex(values[0])
+                mark_combobox_list.remove(combobox)
+                combobox.show()
+        for combobox in mark_combobox_list:
+            combobox.hide()
+
     def gui_reload(self, data):
         # 获取到新数据时，刷新主界面或设置窗口
         map_name, game_id, game_mode, reload_data, kind = data
         i = 0
         self.map.setText(map_name)
+        self.mark_combobox_dic.clear()
         # 根据对局人数，设置窗口尺寸
         if game_mode == 8:
             self.resize(965, 190)
@@ -869,6 +973,8 @@ class MmrWindow(QMainWindow):
                 widget_player.set_text_color(text_color)
                 widget_mmr.set_text_color(text_color)
                 widget_rank = self.findChild(QGraphicsView, 'player' + str(i) + '_rank')
+                widget_combobox = self.findChild(QComboBox, 'player' + str(i) + '_mark')
+                self.mark_combobox_dic[pid] = widget_combobox
                 # 如果是排位模式，显示段位图标
                 if 'rm' in kind:
                     widget_rank.show()
@@ -895,6 +1001,8 @@ class MmrWindow(QMainWindow):
                 widget_player.set_text_color(text_color)
                 widget_mmr.set_text_color(text_color)
                 widget_rank = self.findChild(QGraphicsView, 'player' + str(i) + '_rank')
+                widget_combobox = self.findChild(QComboBox, 'player' + str(i) + '_mark')
+                self.mark_combobox_dic[pid] = widget_combobox
                 if 'rm' in kind:
                     widget_rank.show()
                     widget_rank.setScene(self.player_rank(player_mmr, game_mode))
@@ -923,6 +1031,8 @@ class MmrWindow(QMainWindow):
                 widget_player.set_text_color(text_color)
                 widget_mmr.set_text_color(text_color)
                 widget_rank = self.findChild(QGraphicsView, 'player' + str(i) + '_rank')
+                widget_combobox = self.findChild(QComboBox, 'player' + str(i) + '_mark')
+                self.mark_combobox_dic[pid] = widget_combobox
                 if 'rm' in kind:
                     widget_rank.show()
                     widget_rank.setScene(self.player_rank(player_mmr, game_mode))
@@ -948,11 +1058,14 @@ class MmrWindow(QMainWindow):
                 widget_player.set_text_color(text_color)
                 widget_mmr.set_text_color(text_color)
                 widget_rank = self.findChild(QGraphicsView, 'player' + str(i) + '_rank')
+                widget_combobox = self.findChild(QComboBox, 'player' + str(i) + '_mark')
+                self.mark_combobox_dic[pid] = widget_combobox
                 if 'rm' in kind:
                     widget_rank.show()
                     widget_rank.setScene(self.player_rank(player_mmr, game_mode))
                 else:
                     widget_rank.hide()
+        self.player_mark_reload()
         self.show()
         self.hide_timer.stop()
         self.hide_timer.start()
