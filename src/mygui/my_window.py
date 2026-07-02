@@ -225,7 +225,7 @@ class MyWindow(QMainWindow):
             self.setting_page_widget_showgui_switchbutton.toggled.connect(self.on_switch_button_clicked)
             self.setting_page_widget_showgui_switchbutton.setFixedSize(QSize(40, 20))
             
-            self.setting_page_widget_dragwin_switchbutton_label = QLabel(parent=self.setting_page_normal_setting_widget, text="支持拖拽窗口：")
+            self.setting_page_widget_dragwin_switchbutton_label = QLabel(parent=self.setting_page_normal_setting_widget, text="支持拖拽对局窗口：")
             self.setting_page_widget_dragwin_switchbutton = SwitchButton(parent=self.setting_page_normal_setting_widget)
             self.setting_page_widget_dragwin_switchbutton.setChecked(self.settings.enable_dragging)
             self.setting_page_widget_dragwin_switchbutton.toggled.connect(self.on_switch_button_clicked)

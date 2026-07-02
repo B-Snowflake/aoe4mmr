@@ -153,8 +153,12 @@ class MenuPage(QStackedWidget):
     def refresh_player_mark(self, mark_profile_id, flag, reason):
         self.player_detail_icon_widget_player_mark_combobox.setCurrentIndex(flag)
         self.player_detail_icon_widget_player_mark_label.setText(reason)
-        self.player_detail_icon_widget_player_mark_combobox.show()
-        self.player_detail_icon_widget_player_mark_label.show()
+        if flag != -1:
+            self.player_detail_icon_widget_player_mark_combobox.show()
+            self.player_detail_icon_widget_player_mark_label.show()
+        else:
+            self.player_detail_icon_widget_player_mark_combobox.hide()
+            self.player_detail_icon_widget_player_mark_label.hide()
         for game_history_widget in self.game_history_widgets_collection.values():
             for profile_id, player_widgets in game_history_widget.widgets_collection.items():
                 if profile_id == mark_profile_id:
@@ -163,13 +167,23 @@ class MenuPage(QStackedWidget):
     def mark_player(self, data):
         profile_id, flag, reason = data
         create_time = int(time.time())
-        self.player_mark_dic[profile_id] = (flag, reason, create_time)
-        sql = ("INSERT INTO player_mark (profile_id, flag, reason, create_time) VALUES (?, ?, ?, ?) ON CONFLICT(profile_id) "
-               "DO UPDATE SET flag = excluded.flag, reason = excluded.reason")
-        self.database_queue.put((sql, (profile_id, flag, reason, create_time)))
+        if flag != -1:
+            sql = ("INSERT INTO player_mark (profile_id, flag, reason, create_time) VALUES (?, ?, ?, ?) ON CONFLICT(profile_id) "
+                   "DO UPDATE SET flag = excluded.flag, reason = excluded.reason")
+            self.database_queue.put((sql, (profile_id, flag, reason, create_time)))
+            self.player_mark_dic[profile_id] = (flag, reason, create_time)
+        else:
+            sql = "delete from player_mark where profile_id = ?"
+            self.database_queue.put((sql, (profile_id,)))
+            self.player_mark_dic.pop(profile_id, None)
         self.refresh_player_mark(profile_id, flag, reason)
         self.mark_widget.hide()
-    
+
+    def delete_player_mark(self):
+        self.mark_player((self.applied_player_info[0], -1, ""))
+        self.player_detail_icon_widget_delete_mark_pushbutton.hide()
+        self.player_detail_icon_widget_player_mark_pushbutton.setText("标记玩家")
+
     def reload_player_details(self, data):
         def add_data_to_table(data_list, tablewidget):
             data_list = data_list[0:4]
@@ -182,7 +196,12 @@ class MenuPage(QStackedWidget):
                     tablewidget.setItem(row, col, item)
         
         try:
-            player_id = data['name']
+            full_player_id = data['name']
+            player_id = GameHistoryWidget.islongname(full_player_id)
+            if full_player_id != player_id:
+                self.player_detail_icon_widget_player_name.setToolTip(full_player_id)
+            else:
+                self.player_detail_icon_widget_player_name.setToolTip('')
             avatar = data['avatars']['full']
             country = data['country']
             if avatar:
@@ -271,6 +290,7 @@ class MenuPage(QStackedWidget):
         self.add_new_account_button.show() if self.search_completer.text() and self.player_account_widget_combobox.count() < self.max_accounts else self.add_new_account_button.hide()
         if self.add_new_account_button.isVisible():
             self.player_detail_icon_widget_player_mark_pushbutton.hide()
+            self.player_detail_icon_widget_delete_mark_pushbutton.hide()
         elif not self.add_new_account_button.isVisible() and self.player_account_widget_combobox.findData(self.applied_player_info[0]) == -1:
             self.player_detail_icon_widget_player_mark_pushbutton.show()
             if self.applied_player_info and self.applied_player_info[0] in self.player_mark_dic.keys():
@@ -279,12 +299,15 @@ class MenuPage(QStackedWidget):
                 self.player_detail_icon_widget_player_mark_combobox.setCurrentIndex(self.player_mark_dic[self.applied_player_info[0]][0])
                 self.player_detail_icon_widget_player_mark_label.show()
                 self.player_detail_icon_widget_player_mark_combobox.show()
+                self.player_detail_icon_widget_delete_mark_pushbutton.show()
             else:
-                self.player_detail_icon_widget_player_mark_pushbutton.setText("标记该玩家")
+                self.player_detail_icon_widget_player_mark_pushbutton.setText("标记玩家")
                 self.player_detail_icon_widget_player_mark_label.hide()
                 self.player_detail_icon_widget_player_mark_combobox.hide()
+                self.player_detail_icon_widget_delete_mark_pushbutton.hide()
         else:
             self.player_detail_icon_widget_player_mark_pushbutton.hide()
+            self.player_detail_icon_widget_delete_mark_pushbutton.hide()
         
     def add_new_game_history(self, data_list):
         self.player_account_widget_combobox.setEnabled(True)
@@ -487,10 +510,14 @@ class MenuPage(QStackedWidget):
         self.add_new_account_button.clicked.connect(self.add_new_account)
         self.add_new_account_button.setFixedSize(120, 30)
         self.add_new_account_button.hide()
-        self.player_detail_icon_widget_player_mark_pushbutton = QPushButton(parent=self.player_detail_widget, text="标记该玩家")
+        self.player_detail_icon_widget_player_mark_pushbutton = QPushButton(parent=self.player_detail_widget, text="标记玩家")
         self.player_detail_icon_widget_player_mark_pushbutton.setFixedSize(120, 30)
         self.player_detail_icon_widget_player_mark_pushbutton.clicked.connect(self.show_mark_widget)
         self.player_detail_icon_widget_player_mark_pushbutton.hide()
+        self.player_detail_icon_widget_delete_mark_pushbutton = QPushButton(parent=self.player_detail_widget, text="删除标记")
+        self.player_detail_icon_widget_delete_mark_pushbutton.setFixedSize(120, 30)
+        self.player_detail_icon_widget_delete_mark_pushbutton.clicked.connect(self.delete_player_mark)
+        self.player_detail_icon_widget_delete_mark_pushbutton.hide()
         self.player_detail_widget_layout = QVBoxLayout(self.player_detail_widget)
         self.player_detail_widget_rank_layout = QHBoxLayout()
         self.player_detail_widget_qm_layout = QHBoxLayout()
@@ -498,6 +525,7 @@ class MenuPage(QStackedWidget):
         self.player_detail_button_layout.addStretch(1)
         self.new_page_layout.setContentsMargins(9, 0, 0, 9)
         self.player_detail_button_layout.addWidget(self.add_new_account_button)
+        self.player_detail_button_layout.addWidget(self.player_detail_icon_widget_delete_mark_pushbutton)
         self.player_detail_button_layout.addWidget(self.player_detail_icon_widget_player_mark_pushbutton)
         self.player_detail_widget_layout.setContentsMargins(0, 0, 0, 0)
         self.player_detail_widget_layout.setSpacing(0)
@@ -782,7 +810,7 @@ class GameHistoryWidget(QWidget):
         self.apply_signal = apply_signal
         self.main_layout = QHBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(25)
+        self.main_layout.setSpacing(15)
         self.result_widget = QWidget(parent=self)
         self.left_side_widget = QWidget(parent=self)
         self.mid_side_widget = QWidget(parent=self)
@@ -829,7 +857,8 @@ class GameHistoryWidget(QWidget):
         self.set_mid_side_widget()
         self.set_left_and_right_side_widget()
 
-    def islongname(self, string):
+    @staticmethod
+    def islongname(string):
         def has_chinese(string):
             # 判断游戏ID是否包含中文
             pattern = '[\u4e00-\u9fa5]'
@@ -838,14 +867,14 @@ class GameHistoryWidget(QWidget):
                 return True
             else:
                 return False
-        # 如果游戏ID包含中文，则在主界面仅显示ID前10个字符，否则显示25个
+        # 如果游戏ID包含中文，则在主界面仅显示ID前10个字符，否则显示20个
         language = has_chinese(string)
         if language:
             if len(string) > 10:
                 string = string[0:10] + '...'
         else:
-            if len(string) > 25:
-                string = string[0:25] + '...'
+            if len(string) > 20:
+                string = string[0:20] + '...'
         return string
     
     def on_player_name_clicked(self, player_info):
@@ -865,10 +894,8 @@ class GameHistoryWidget(QWidget):
 
     def set_player_mark(self, profile_id, flag, reason):
         mark_combobox = self.widgets_collection[profile_id]['mark_combobox']
-        name_label = self.widgets_collection[profile_id]['name_label']
         mark_combobox.setCurrentIndex(flag)
         mark_combobox.setToolTip(reason)
-        name_label.setToolTip(reason)
 
     def set_left_and_right_side_widget(self):
 
@@ -912,7 +939,12 @@ class GameHistoryWidget(QWidget):
                 pixmap = QPixmap(QSize(24, 37))
                 pixmap.fill(Qt.transparent)
             player_rank_icon_label.setPixmap(pixmap)
-            player_name_label = ClickableLabel(id=profile_id, name=player, parent=parent, text=self.islongname(player))         
+            player_name = self.islongname(player)
+            player_name_label = ClickableLabel(id=profile_id, name=player, parent=parent, text=player_name)
+            if player_name != player:
+                player_name_label.setToolTip(player)
+            else:
+                player_name_label.setToolTip('')
             player_name_label.setStyleSheet("color: rgb(114, 137, 218)" if self.profile_id == profile_id else "")
             player_name_label.clicked.connect(self.on_player_name_clicked)
             player_civ_label = QLabel(parent=parent)
@@ -926,9 +958,9 @@ class GameHistoryWidget(QWidget):
             if mark := self.player_mark_dic.get(profile_id):
                 player_mark_combobox.setCurrentIndex(mark[0])
                 player_mark_combobox.setToolTip(mark[1])
-                player_name_label.setToolTip(mark[1])
             else:
                 player_mark_combobox.setCurrentIndex(-1)
+                player_mark_combobox.setToolTip('')
             player_mmr_label = QLabel(parent=parent, text=player_mmr)
             self.widgets_collection[profile_id] = {}
             self.widgets_collection[profile_id]['name_label'] = player_name_label
