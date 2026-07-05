@@ -34,7 +34,7 @@ class LeftMenu(QWidget):
         self.add_toolbutton("new_button", "新增", ":images/icons/cil-library-add.svg", 1)
         self.main_layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         self.pages = pages
-        self.toolbutton_record = []
+        self.button_record = []
         self.record_offset_index = 0
 
     def add_toolbutton(self, objectname, text, icon, page_index):
@@ -52,13 +52,13 @@ class LeftMenu(QWidget):
     def switch_page(self, checked=None, sender=None, no_record=False):
         sender = sender if sender else self.sender() 
         if not no_record:
-            if self.toolbutton_record.__len__() > 6:
-                self.toolbutton_record = self.toolbutton_record[1:]
+            if self.button_record.__len__() > 6:
+                self.button_record = self.button_record[1:]
             if self.record_offset_index != 0:
-                index = self.toolbutton_record.__len__() + self.record_offset_index
-                self.toolbutton_record = self.toolbutton_record[0:index]
+                index = self.button_record.__len__() + self.record_offset_index
+                self.button_record = self.button_record[0:index]
             self.record_offset_index = 0
-            self.toolbutton_record.append(sender)
+            self.button_record.append(sender)
         else:
             sender.setChecked(True)
         for objectname, values in self.toolbutton_dic.items():

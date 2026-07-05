@@ -90,16 +90,14 @@ class Aoe4mmr:
             self.gui_reload(reason="reload player", data=self.settings.profile_id)        
     
     def backward_forward(self, step):
-        index_len = self.main_window.left_menu.toolbutton_record.__len__()
-        print(self.main_window.left_menu.record_offset_index, index_len)
-        print(self.main_window.left_menu.toolbutton_record)
+        index_len = self.main_window.left_menu.button_record.__len__()
         if step == "forward" and self.main_window.left_menu.record_offset_index < 0:        
             self.main_window.left_menu.record_offset_index = self.main_window.left_menu.record_offset_index + 1
-            button = self.main_window.left_menu.toolbutton_record[index_len+self.main_window.left_menu.record_offset_index-1]
+            button = self.main_window.left_menu.button_record[index_len + self.main_window.left_menu.record_offset_index - 1]
             self.main_window.left_menu.switch_page(sender=button, no_record=True)
         elif step == "backward" and abs(self.main_window.left_menu.record_offset_index) < index_len :
             self.main_window.left_menu.record_offset_index = self.main_window.left_menu.record_offset_index - 1          
-            button = self.main_window.left_menu.toolbutton_record[index_len+self.main_window.left_menu.record_offset_index-1]
+            button = self.main_window.left_menu.button_record[index_len + self.main_window.left_menu.record_offset_index - 1]
             self.main_window.left_menu.switch_page(sender=button, no_record=True)
     
     def new_version(self, version):
