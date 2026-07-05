@@ -260,3 +260,7 @@ QScrollBar::left-arrow:horizontal,
 QScrollBar::right-arrow:horizontal {
     background: none;        /* 隐藏箭头 */
 }
+
+QToolButton#reload_toolbutton {
+    border: none;
+}

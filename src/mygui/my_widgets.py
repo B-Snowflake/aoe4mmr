@@ -15,6 +15,7 @@ from retrying import retry
 from PySide6.QtGui import *
 from PySide6.QtCore import *
 from PySide6.QtWidgets import *
+from PySide6.QtSvg import QSvgRenderer
 from collections import defaultdict
 
 from traitlets import ObjectName
@@ -32,7 +33,6 @@ class LeftMenu(QWidget):
         self.add_toolbutton("home_button", "主页", ":images/icons/cil-home.svg", 0)
         self.add_toolbutton("new_button", "新增", ":images/icons/cil-library-add.svg", 1)
         self.main_layout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-        self.toolbutton_dic['home_button'][0].setChecked(True)
         self.pages = pages
         self.toolbutton_record = []
         self.record_offset_index = 0
@@ -56,7 +56,7 @@ class LeftMenu(QWidget):
                 self.toolbutton_record = self.toolbutton_record[1:]
             if self.record_offset_index != 0:
                 index = self.toolbutton_record.__len__() + self.record_offset_index
-                self.toolbutton_record[0:index]
+                self.toolbutton_record = self.toolbutton_record[0:index]
             self.record_offset_index = 0
             self.toolbutton_record.append(sender)
         else:
@@ -91,6 +91,10 @@ class MenuPage(QStackedWidget):
         self.map_dic = map_dic
         self.database_queue = database_queue
         self.max_show_gamehistory = max_show_gamehistory
+        self.player_account_widget_reload_toolbutton_angle = 0
+        self.data_loader_timer = QTimer(parent=self, interval=20)
+        self.data_loader_timer.timeout.connect(self.rotate_image)
+        self.svg_renderer = QSvgRenderer(":/images/icons/cil-reload.svg")
         self.addWidget(self.home_page)
         self.addWidget(self.new_page)  
         self.set_home_page()
@@ -311,6 +315,7 @@ class MenuPage(QStackedWidget):
         
     def add_new_game_history(self, data_list):
         self.player_account_widget_combobox.setEnabled(True)
+        self.player_account_widget_reload_toolbutton.setEnabled(True)
         for data in data_list[0:self.max_show_gamehistory]:
             if data[1] in self.game_history_widgets_collection.keys():
                 self.game_history_widgets_collection[data[1]].deleteLater()
@@ -319,6 +324,7 @@ class MenuPage(QStackedWidget):
             self.game_history_widgets_collection[game_id] = game_history_widgets
             self.player_game_history_widget_layout.addWidget(game_history_widgets)
         self.sort_game_history_widgets()
+        self.data_loader_timer.stop()
             
     def sort_game_history_widgets(self):
         # 1. 取排序后的 key
@@ -338,7 +344,25 @@ class MenuPage(QStackedWidget):
     def set_by_data(combo, target):
         index = combo.findData(target) if combo.findData(target) != -1 else 0
         return index
-    
+
+    def on_reload_toolbutton_clicked(self):
+        self.on_player_account_widget_combobox_currentIndexChanged(self.player_account_widget_combobox.currentIndex())
+
+    def rotate_image(self):
+        self.player_account_widget_reload_toolbutton_angle += 5
+        if self.player_account_widget_reload_toolbutton_angle >= 360:
+            self.player_account_widget_reload_toolbutton_angle = 0
+        pixmap = QPixmap(self.player_account_widget_reload_toolbutton.size())
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.translate(pixmap.width() / 2, pixmap.height() / 2)
+        painter.rotate(self.player_account_widget_reload_toolbutton_angle)
+        painter.translate(-pixmap.width() / 2, -pixmap.height() / 2)
+        self.svg_renderer.render(painter)  # QSvgRenderer
+        painter.end()
+        self.player_account_widget_reload_toolbutton.setIcon(QIcon(pixmap))
+        self.player_account_widget_reload_toolbutton.setIconSize(pixmap.size())
+
     def set_home_page(self):
         self.home_page_layout = QVBoxLayout(self.home_page)
         self.player_account_widget = QTableWidget(self.home_page)
@@ -346,7 +370,24 @@ class MenuPage(QStackedWidget):
         self.player_account_widget_label = QLabel(self.player_account_widget, text="我的账户：")
         self.player_account_widget_combobox = QComboBox(self.player_account_widget)
         self.player_account_widget_combobox.setMaximumWidth(250)
+        self.player_account_widget_combobox.setMinimumWidth(200)
         self.player_account_widget_combobox.currentIndexChanged.connect(self.on_player_account_widget_combobox_currentIndexChanged)
+        self.player_account_widget_reload_toolbutton = QToolButton(parent=self.player_account_widget, ObjectName='reload_toolbutton')
+        self.player_account_widget_reload_toolbutton.clicked.connect(self.on_reload_toolbutton_clicked)
+        self.player_account_widget_reload_toolbutton.setShortcut('F5')
+        icon = QIcon(":/images/icons/cil-reload.svg")
+        self.player_account_widget_reload_toolbutton.setIcon(icon)
+        self.player_account_widget_reload_toolbutton.setIconSize(QSize(15, 15))
+        self.player_account_widget_reload_toolbutton.setFixedSize(15, 15)
+        # self.player_account_widget_reload_toolbutton_pixmap = QPixmap(':images/icons/cil-reload.svg').scaled(self.player_account_widget_reload_toolbutton.size())
+        # self.player_account_widget_reload_toolbutton.setIcon(self.player_account_widget_reload_toolbutton_pixmap)
+
+        self.player_account_widget_account_layout  = QHBoxLayout(self.player_account_widget)
+        self.player_account_widget_account_layout.setContentsMargins(0, 0, 0, 0)
+        self.player_account_widget_account_layout.setSpacing(30)
+        self.player_account_widget_account_layout.addWidget(self.player_account_widget_combobox, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.player_account_widget_account_layout.addWidget(self.player_account_widget_reload_toolbutton, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.player_account_widget_account_layout.addStretch(1)
         
         self.player_game_history_widget_scrollarea = QScrollArea(self.home_page)
         self.player_game_history_widget_scrollarea.setViewportMargins(0, 0, 0, 0)
@@ -362,11 +403,13 @@ class MenuPage(QStackedWidget):
         self.player_account_widget_layout.addWidget(self.player_account_widget_combobox)
         
         self.home_page_layout.addWidget(self.player_account_widget_label)
-        self.home_page_layout.addWidget(self.player_account_widget_combobox)
+        self.home_page_layout.addLayout(self.player_account_widget_account_layout)
         self.home_page_layout.addWidget(self.player_game_history_widget_scrollarea)
 
     def on_player_account_widget_combobox_currentIndexChanged(self, index):
         if index != -1:
+            self.player_account_widget_reload_toolbutton.setEnabled(False)
+            self.data_loader_timer.start()
             self.player_account_widget_combobox.setEnabled(False)
             profile_id = self.player_account_widget_combobox.currentData()
             for key, value in self.game_history_widgets_collection.items():

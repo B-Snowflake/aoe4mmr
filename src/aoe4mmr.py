@@ -86,10 +86,13 @@ class Aoe4mmr:
         if not self.settings.profile_id:
             self.main_window.left_menu.toolbutton_dic['new_button'][0].click()
         else:
+            self.main_window.left_menu.toolbutton_dic['home_button'][0].click()
             self.gui_reload(reason="reload player", data=self.settings.profile_id)        
     
     def backward_forward(self, step):
         index_len = self.main_window.left_menu.toolbutton_record.__len__()
+        print(self.main_window.left_menu.record_offset_index, index_len)
+        print(self.main_window.left_menu.toolbutton_record)
         if step == "forward" and self.main_window.left_menu.record_offset_index < 0:        
             self.main_window.left_menu.record_offset_index = self.main_window.left_menu.record_offset_index + 1
             button = self.main_window.left_menu.toolbutton_record[index_len+self.main_window.left_menu.record_offset_index-1]

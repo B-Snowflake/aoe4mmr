@@ -90,11 +90,8 @@ class Data:
                 # 如果该局游戏是新开的，则请求该对局数据
                 # if game_id != self.last_game_id and last_game_json['ongoing']:
                 if game_id != self.last_game_id:
-                    map = last_game_json['map']
-                    try:
-                        map_chinese = self.map_dic[map]
-                    except:
-                        map_chinese = map
+                    map_english = last_game_json['map']
+                    map_chinese = self.map_dic.get(map_english, map_english)
                     teams = last_game_json['teams']
                     last_game_kind = last_game_json['kind']
                     # 根据游戏类型，来拼接请求url
@@ -125,14 +122,14 @@ class Data:
                             else:
                                 player_mmr = '--'
                                 win_rate = '--'
-                            values = (game_id, player, str(win_rate), civilization, map_chinese, player_profile_id, str(player_mmr), str(i), kind)
+                            values = (game_id, player, str(win_rate), civilization, map_chinese, str(player_profile_id), str(player_mmr), str(i), kind)
                             insert_sql = """
                                             INSERT INTO last_game ( game_id, player, win_rate, civilization, map, profile_id, player_mmr, team, kind )
                                             VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )
                                         """
                             # 写入数据库
                             self.database_queue.put((insert_sql, values))
-                            player_data_list.append((str(player), civilization, player_profile_id, str(player_mmr), str(win_rate), str(kind)))
+                            player_data_list.append((str(player), civilization, str(player_profile_id), str(player_mmr), str(win_rate), str(kind)))
                     # 数据校验，如果本次请求的数据缺失，终止
                     if last_game_kind in ('rm_1v1', 'qm_1v1') and player_counts != 2:
                         error = True

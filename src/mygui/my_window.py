@@ -945,7 +945,7 @@ class MmrWindow(QMainWindow):
             combobox.hide()
 
     def gui_reload(self, data):
-        # 获取到新数据时，刷新主界面或设置窗口
+        # 获取到新数据时，刷新界面
         map_name, game_id, game_mode, reload_data, kind = data
         i = 0
         self.map.setText(map_name)
