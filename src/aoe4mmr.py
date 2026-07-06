@@ -80,7 +80,7 @@ class Aoe4mmr:
         self.tray_icon.setIcon(self.app_icon)
         self.tray_icon.setToolTip('Aoe4mmr')
         self.tray_icon.setContextMenu(self.tray_icon_menu)
-        self.tray_icon.activated.connect(self.tray_icon_clicked)
+        self.tray_icon.activated.connect(self.on_tray_icon_clicked)
         self.tray_icon.show()
         self.load_data_from_user_database()
         if not self.settings.profile_id:
@@ -204,7 +204,7 @@ class Aoe4mmr:
             conn.commit()
         conn.close()
     
-    def tray_icon_clicked(self, reason):
+    def on_tray_icon_clicked(self, reason):
         # 双击任务栏图标时，显示/隐藏界面
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
             if self.main_window.isVisible():

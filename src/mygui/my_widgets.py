@@ -910,14 +910,14 @@ class GameHistoryWidget(QWidget):
                 return True
             else:
                 return False
-        # 如果游戏ID包含中文，则在主界面仅显示ID前10个字符，否则显示20个
+        # 如果游戏ID包含中文，则在主界面仅显示ID前10个字符，否则显示15个
         language = has_chinese(string)
         if language:
             if len(string) > 10:
                 string = string[0:10] + '...'
         else:
-            if len(string) > 20:
-                string = string[0:20] + '...'
+            if len(string) > 15:
+                string = string[0:15] + '...'
         return string
     
     def on_player_name_clicked(self, player_info):

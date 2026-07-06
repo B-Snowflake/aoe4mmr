@@ -1080,14 +1080,14 @@ class MmrWindow(QMainWindow):
                 return True
             else:
                 return False
-        # 如果游戏ID包含中文，则在主界面仅显示ID前10个字符，否则显示25个
+        # 如果游戏ID包含中文，则在主界面仅显示ID前10个字符，否则显示20个
         language = has_chinese(string)
         if language:
             if len(string) > 10:
                 string = string[0:10] + '...'
         else:
-            if len(string) > 25:
-                string = string[0:25] + '...'
+            if len(string) > 20:
+                string = string[0:20] + '...'
         return string
     
     def checkplayer(self, player_id):
