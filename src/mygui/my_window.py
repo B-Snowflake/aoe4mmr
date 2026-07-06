@@ -111,8 +111,8 @@ class MyWindow(QMainWindow):
         if self.isVisible() and self.isActiveWindow():
             self.hide()
         else:
-            self.hide()
             self.show()
+            self.activateWindow()
             self.raise_()
     
     def show_message(self, message):

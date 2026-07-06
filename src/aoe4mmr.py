@@ -211,6 +211,8 @@ class Aoe4mmr:
                 self.main_window.hide()
             else:
                 self.main_window.show()
+                self.main_window.activateWindow()
+                self.main_window.raise_()
                 
     def gui_reload(self, reason, data):
         # 刷新界面数据

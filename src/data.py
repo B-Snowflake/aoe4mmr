@@ -78,7 +78,6 @@ class Data:
     @func_timeout.func_set_timeout(80)
     def get_data(self):
         # 从API接口获取最新的游戏对局数据
-        values = ''
         player_data_list = []
         error = False
         try:
@@ -88,8 +87,8 @@ class Data:
                 last_game_json = json.loads(lastgame.content.decode())
                 game_id = last_game_json['game_id']
                 # 如果该局游戏是新开的，则请求该对局数据
-                # if game_id != self.last_game_id and last_game_json['ongoing']:
-                if game_id != self.last_game_id:
+                if game_id != self.last_game_id and last_game_json['ongoing']:
+                # if game_id != self.last_game_id:
                     map_english = last_game_json['map']
                     map_chinese = self.map_dic.get(map_english, map_english)
                     teams = last_game_json['teams']
