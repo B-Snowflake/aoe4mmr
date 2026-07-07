@@ -109,11 +109,10 @@ class Data:
                         for element in elements:
                             player_counts += 1
                             player = str(element['name'])
-                            try:
+                            if element['rating']:
                                 player_mmr = element['rating']
-                            except:
+                            else:
                                 player_mmr = '--'
-                            player = str.replace(player, "'", "''")
                             civilization = element['civilization']
                             player_profile_id = element['profile_id']
                             # 根据游戏类型（排位、快速比赛、3V3/4V4/2V2/1V1）请求玩家mmr
