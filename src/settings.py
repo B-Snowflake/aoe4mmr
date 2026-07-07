@@ -21,7 +21,7 @@ class Settings:
     enable_dragging: bool = False
     show_gui_when_startup: bool = True
     window_location: list = field(default_factory=list)
-    max_show_gamehistory: int = 10
+    max_show_game_history: int = 10
     max_accounts: int = 6
     picked_profile_id: str = ""
     profile_id: dict[str, ProfileId] = field(default_factory=dict)

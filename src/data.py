@@ -82,9 +82,9 @@ class Data:
         error = False
         try:
             # 获取最新游戏对局
-            lastgame = self.get_response(url=f'https://aoe4world.com/api/v0/players/{self.profile_id}/games/last')
-            if lastgame:
-                last_game_json = json.loads(lastgame.content.decode())
+            last_game = self.get_response(url=f'https://aoe4world.com/api/v0/players/{self.profile_id}/games/last')
+            if last_game:
+                last_game_json = json.loads(last_game.content.decode())
                 game_id = last_game_json['game_id']
                 # 如果该局游戏是新开的，则请求该对局数据
                 if game_id != self.last_game_id and last_game_json['ongoing']:
@@ -109,6 +109,10 @@ class Data:
                         for element in elements:
                             player_counts += 1
                             player = str(element['name'])
+                            try:
+                                player_mmr = element['rating']
+                            except:
+                                player_mmr = '--'
                             player = str.replace(player, "'", "''")
                             civilization = element['civilization']
                             player_profile_id = element['profile_id']
@@ -116,16 +120,14 @@ class Data:
                             player_leaderboards = self.get_response(f'https://aoe4world.com/api/v0/leaderboards/{kind}?profile_id={player_profile_id}')
                             player_leaderboards_json = json.loads(player_leaderboards.content.decode())
                             if bool(player_leaderboards_json['players']):
-                                player_mmr = player_leaderboards_json['players'][0]['rating']
+                                # player_mmr = player_leaderboards_json['players'][0]['rating']
                                 win_rate = player_leaderboards_json['players'][0]['win_rate']
                             else:
-                                player_mmr = '--'
+                                # player_mmr = '--'
                                 win_rate = '--'
                             values = (game_id, player, str(win_rate), civilization, map_chinese, str(player_profile_id), str(player_mmr), str(i), kind)
-                            insert_sql = """
-                                            INSERT INTO last_game ( game_id, player, win_rate, civilization, map, profile_id, player_mmr, team, kind )
-                                            VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )
-                                        """
+                            insert_sql = ("INSERT INTO last_game ( game_id, player, win_rate, civilization, map, profile_id, player_mmr, team, kind ) "
+                                          "VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )")
                             # 写入数据库
                             self.database_queue.put((insert_sql, values))
                             player_data_list.append((str(player), civilization, str(player_profile_id), str(player_mmr), str(win_rate), str(kind)))

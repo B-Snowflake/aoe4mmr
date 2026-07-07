@@ -76,7 +76,7 @@ class MenuPage(QStackedWidget):
     apply_signal = Signal(tuple)
     add_new_game_history_signal = Signal(list)
     
-    def __init__(self, add_new_account_signal, settings_changed_signal, max_show_gamehistory, max_accounts, 
+    def __init__(self, add_new_account_signal, settings_changed_signal, max_show_game_history, max_accounts,
                  picked_profile_id, civilization_icon_dic, map_dic, rank_icon_dic, database_queue, player_mark_dic, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.home_page = QWidget(self)
@@ -90,7 +90,7 @@ class MenuPage(QStackedWidget):
         self.settings_changed_signal = settings_changed_signal
         self.map_dic = map_dic
         self.database_queue = database_queue
-        self.max_show_gamehistory = max_show_gamehistory
+        self.max_show_game_history = max_show_game_history
         self.player_account_widget_reload_toolbutton_angle = 0
         self.data_loader_timer = QTimer(parent=self, interval=20)
         self.data_loader_timer.timeout.connect(self.rotate_image)
@@ -100,7 +100,7 @@ class MenuPage(QStackedWidget):
         self.set_home_page()
         self.set_new_page()
         self.set_mark_widget()
-        self.search_player_details = PlayerDetail(self.detail_signal, self.add_new_game_history_signal)
+        self.search_player_details = PlayerDetail(self.detail_signal, self.add_new_game_history_signal, self.max_show_game_history)
         self.add_new_game_history_signal.connect(self.add_new_game_history)
         self.detail_signal.connect(self.reload_player_details)
         self.apply_signal.connect(self.apply_player_details)
@@ -111,6 +111,10 @@ class MenuPage(QStackedWidget):
         profile_id, profile_name = player_info
         self.applied_player_info = player_info
         self.search_player_details.get_detail(profile_id)
+
+    def set_max_show_game_history(self, num):
+        self.max_show_game_history = num
+        self.search_player_details.set_max_game_history(num)
 
     def set_mark_widget(self):
         self.mark_widget = QWidget(parent=self.new_page, ObjectName="mark_widget")
@@ -316,7 +320,7 @@ class MenuPage(QStackedWidget):
     def add_new_game_history(self, data_list):
         self.player_account_widget_combobox.setEnabled(True)
         self.player_account_widget_reload_toolbutton.setEnabled(True)
-        for data in data_list[0:self.max_show_gamehistory]:
+        for data in data_list:
             if data[1] in self.game_history_widgets_collection.keys():
                 self.game_history_widgets_collection[data[1]].deleteLater()
             game_history_widgets = GameHistoryWidget(self.civilization_icon_dic, self.map_dic, self.rank_icon_dic, data, self.apply_signal, self.player_mark_dic, parent=self.player_game_history_widget)
@@ -762,12 +766,16 @@ class PlayerSearch:
     
     
 class PlayerDetail:
-    def __init__(self, detail_signal, add_new_game_history_signal):
+    def __init__(self, detail_signal, add_new_game_history_signal, max_game_history):
         self.detail_url = 'https://aoe4world.com/api/v0/players/{}'
         self.game_history_url = 'https://aoe4world.com/api/v0/players/{}/games'
         self.detail_signal = detail_signal
+        self.max_game_history = max_game_history
         self.add_new_game_history_signal = add_new_game_history_signal
-        
+
+    def set_max_game_history(self, max_game_history):
+        self.max_game_history = max_game_history
+
     def get_game_history(self, profile_id):
         def req(profile_id):
             data_list = []
@@ -777,7 +785,7 @@ class PlayerDetail:
                 index = 0
                 for game in response_data['games']:
                     index = index + 1 
-                    if index > 100:
+                    if index > self.max_game_history:
                         break
                     player_data = []
                     map_name = game['map']
@@ -947,22 +955,27 @@ class GameHistoryWidget(QWidget):
             self.result_widget_layout.setContentsMargins(0, 0, 0, 0)
             self.result_widget_layout.setSpacing(5)
             if self.result:
-                result_text = "↑" if self.result=='win' else "↓"
-            else:
-                result_text = " "
-            self.result_label = QLabel(parent=self.result_widget, text=result_text)
-            style = "color: green" if self.result=='win' else "color: red"
-            self.result_label.setStyleSheet(style)
-
-            if self.rating_diff:
-                if self.rating_diff > 0:
-                    rating_diff_text = f'+{self.rating_diff}'
-                elif self.rating_diff <= 0:
-                    rating_diff_text = f'{self.rating_diff}'
+                if self.result == 'win':
+                    style = "color: green"
+                    result_text = "↑"
+                else:
+                    style = "color: red"
+                    result_text = "↓"
+                if self.rating_diff:
+                    if self.rating_diff > 0:
+                        rating_diff_text = f'+{self.rating_diff}'
+                    elif self.rating_diff <= 0:
+                        rating_diff_text = f'{self.rating_diff}'
+                    else:
+                        rating_diff_text = '--'
                 else:
                     rating_diff_text = '--'
             else:
-                rating_diff_text = '--'
+                style = ""
+                result_text = " "
+                rating_diff_text = ' '
+            self.result_label = QLabel(parent=self.result_widget, text=result_text)
+            self.result_label.setStyleSheet(style)
             self.rating_diff_label = QLabel(parent=self.result_widget, text=rating_diff_text)
             self.rating_diff_label.setFixedWidth(25)
             self.rating_diff_label.setStyleSheet(style)

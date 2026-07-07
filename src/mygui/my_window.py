@@ -51,7 +51,7 @@ class MyWindow(QMainWindow):
         self.setCentralWidget(self.center_widget)
         self.new_version_signal.connect(self.on_new_version_founded)
         self.toggle_window_signal.connect(self.toggle_window)
-        self.menu_page = my_widgets.MenuPage(self.add_new_account_signal, self.settings_changed_signal, self.settings.max_show_gamehistory, 
+        self.menu_page = my_widgets.MenuPage(self.add_new_account_signal, self.settings_changed_signal, self.settings.max_show_game_history,
                                              self.settings.max_accounts, self.settings.picked_profile_id, self.civilization_icon_dic,
                                              self.map_dic, self.rank_icon_dic, self.database_queue, self.player_mark_dic, parent=self, ObjectName="menu_page")
         self.menu_page.apply_signal.connect(self.apply_new)
@@ -164,13 +164,13 @@ class MyWindow(QMainWindow):
         
     def on_setting_page_widget_max_show_gamehistory_lineedit_editingFinished(self):
         number = int(self.setting_page_widget_max_show_gamehistory_lineedit.text())
-        if number == self.settings.max_show_gamehistory:
+        if number == self.settings.max_show_game_history:
             return
         number = min(max(3, number), 99)
         self.setting_page_widget_max_show_gamehistory_lineedit.setText(str(number))
-        self.settings.max_show_gamehistory = number
+        self.settings.max_show_game_history = number
         self.settings.save()
-        self.menu_page.max_show_gamehistory = number
+        self.menu_page.set_max_show_game_history(number)
         self.menu_page.on_player_account_widget_combobox_currentIndexChanged(self.menu_page.player_account_widget_combobox.currentIndex())
         
     def set_setting_page(self):
@@ -236,7 +236,7 @@ class MyWindow(QMainWindow):
             validator = QIntValidator(0, 99, self.setting_page_normal_setting_widget)
             self.setting_page_widget_max_show_gamehistory_lineedit.setValidator(validator)
             self.setting_page_widget_max_show_gamehistory_lineedit.editingFinished.connect(self.on_setting_page_widget_max_show_gamehistory_lineedit_editingFinished)
-            self.setting_page_widget_max_show_gamehistory_lineedit.setText(str(self.settings.max_show_gamehistory))
+            self.setting_page_widget_max_show_gamehistory_lineedit.setText(str(self.settings.max_show_game_history))
             
             self.setting_page_widget_show_win_label = QLabel(text="打开窗口快捷键：")
             self.setting_page_widget_show_win_button = QPushButton(parent=self.setting_page_normal_setting_widget, text=self.settings.hotkey, ObjectName="setting_page_widget_show_win_button")
