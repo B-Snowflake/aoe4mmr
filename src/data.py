@@ -31,6 +31,7 @@ class Data:
         self.version_check_url = 'https://github.com/B-Snowflake/aoe4mmr/releases/latest'
         self.version_check_time = None
         self.game_data_request_time = 0
+        self.game_data_max_request_time = 2
         self.version_player_check()
 
     def set_profile_id(self, profile_id):
@@ -146,14 +147,10 @@ class Data:
                         error = True
                     elif last_game_kind in ('rm_4v4', 'qm_4v4') and player_counts != 8:
                         error = True
-                    if error:
-                        self.database_queue.put(("delete from last_game where game_id = ?", (game_id, )))
-                        print(f'game_id:{game_id}, 本次获取的数据不完整')
-                        return
-                    else:
+                    if not error:
                         self.game_data_request_time += 1
                         print(f'{game_id}:第{self.game_data_request_time}次数据请求完成')
-                        if self.game_data_request_time == 3:
+                        if self.game_data_request_time == self.game_data_max_request_time:
                             self.last_game_id = game_id
                             # 写入数据库
                             for insert_sql, values in game_data_list:
@@ -162,6 +159,9 @@ class Data:
                         last_game_data = (map_chinese, str(game_id), len(player_data_list), player_data_list, kind)
                         self.gui_reload('reload game', last_game_data)
                         self.database_queue.put(("delete from last_game where game_id <> ?", (game_id,)))
+                    else:
+                        print(f'game_id:{game_id}, 本次获取的数据不完整')
+                        return
         except Exception as e:
             # 发生异常时，写入异常信息
             new_content = "\n" + time.strftime("%Y.%m.%d %H:%M:%S") + ": when request exception -- " + str(traceback.format_exc())
@@ -175,9 +175,9 @@ class Data:
                 try:
                     self.get_data()
                 except func_timeout.exceptions.FunctionTimedOut as e:
-                    new_content = "\n" + time.strftime("%Y.%m.%d %H:%M:%S") + ": when timesleep exception -- " + str(e)
+                    new_content = "\n" + time.strftime("%Y.%m.%d %H:%M:%S") + ": when time sleep exception -- " + str(e)
                     print(new_content)
-                if self.game_data_request_time == 3:
+                if self.game_data_request_time == self.game_data_max_request_time:
                     self.game_data_request_time = 0
                 time.sleep(10)
             else:

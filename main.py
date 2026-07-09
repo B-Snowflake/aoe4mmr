@@ -19,6 +19,8 @@ base_path = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation
 if not base_path.exists():
     os.makedirs(base_path, exist_ok=True)
 log_path = base_path / "error.log"
+if log_path.exists() and log_path.stat().st_size > 1_000_000:
+    log_path.unlink()
 logging.basicConfig(filename=log_path, level=logging.ERROR, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 

@@ -9,6 +9,7 @@ import json
 import urllib3
 import requests
 import threading
+from babel import Locale
 from rapidfuzz import fuzz
 from datetime import datetime
 from retrying import retry
@@ -17,8 +18,6 @@ from PySide6.QtCore import *
 from PySide6.QtWidgets import *
 from PySide6.QtSvg import QSvgRenderer
 from collections import defaultdict
-
-from traitlets import ObjectName
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -213,6 +212,7 @@ class MenuPage(QStackedWidget):
                 self.player_detail_icon_widget_player_name.setToolTip('')
             avatar = data['avatars']['full']
             country = data['country']
+            country_name = data['country_name']
             if avatar:
                 avatar_pixmap = QPixmap()
                 avatar_pixmap.loadFromData(avatar)
@@ -224,9 +224,12 @@ class MenuPage(QStackedWidget):
                 country_pixmap = QPixmap()
                 country_pixmap.loadFromData(country)
                 self.player_detail_icon_widget_country_icon.setPixmap(country_pixmap.scaled(40, 27))
+                self.player_detail_icon_widget_country_name.setText(country_name)
                 self.player_detail_icon_widget_country_icon.show()
+                self.player_detail_icon_widget_country_name.show()
             else:
                 self.player_detail_icon_widget_country_icon.hide()
+                self.player_detail_icon_widget_country_name.hide()
             self.player_detail_icon_widget_player_name.setText(player_id)
             self.player_detail_icon_widget_player_name.show()
         except Exception as e:
@@ -247,7 +250,7 @@ class MenuPage(QStackedWidget):
                 qm_data = [(value.replace('qm_', ''), data['modes'][value]['rating'], data['modes'][value]['win_rate']) for value in mode_dic['qm_data']]
             else:
                 qm_data = nodata
-                print('no qm_data')
+                print(f'{self.applied_player_info[1]}: no qm_data')
         except Exception as e:
             qm_data = nodata
             print('error when get qm_data', e)
@@ -263,7 +266,7 @@ class MenuPage(QStackedWidget):
                     pass
             else:
                 rm_team_data = nodata
-                print('no rm_team_data')
+                print(f'{self.applied_player_info[1]}: no rm_team_data')
         except Exception as e:
             rm_team_data = nodata
             print('error when get rm_team_data', e)
@@ -279,7 +282,7 @@ class MenuPage(QStackedWidget):
                     pass
             else:
                 rm_solo_data = nodata
-                print('no rm_solo_data')
+                print(f'{self.applied_player_info[1]}: no rm_solo_data')
         except Exception as e:
             rm_solo_data = nodata
             print('error when get rm_solo_data', e)
@@ -290,7 +293,7 @@ class MenuPage(QStackedWidget):
                 rm_elo_data = [(value.replace('rm_', ''), data['modes'][value]['rating'], data['modes'][value]['win_rate']) for value in mode_dic['rm_elo_data']]
             else:
                 rm_elo_data = nodata
-                print('no rm_elo_data')
+                print(f'{self.applied_player_info[1]}: no rm_elo_data')
         except Exception as e:
             rm_elo_data = nodata
             print('error when get rm_elo_data', e)
@@ -432,7 +435,6 @@ class MenuPage(QStackedWidget):
         accounts = [(value.profile_name, value.profile_id) for key, value in data.items()]
         for profile_name, profile_id in accounts:
             self.player_account_widget_combobox.addItem(profile_name, profile_id)
-        self.player_account_widget_combobox.setCurrentIndex(-1)
         if reload:
             self.player_account_widget_combobox.blockSignals(False)
             self.player_account_widget_combobox.setCurrentIndex(self.set_by_data(picked_profile_id))
@@ -458,12 +460,20 @@ class MenuPage(QStackedWidget):
             self.player_detail_icon_widget_country_layout.setSpacing(10)
             self.player_detail_icon_widget_country_icon = QLabel(self.player_detail_widget)
             self.player_detail_icon_widget_country_icon.hide()
+            self.player_detail_icon_widget_country_name = QLabel(self.player_detail_widget)
+            self.player_detail_icon_widget_country_name.hide()
+            self.player_detail_icon_widget_country_flag_layout = QHBoxLayout()
+            self.player_detail_icon_widget_country_flag_layout.setContentsMargins(0, 0, 0, 5)
+            self.player_detail_icon_widget_country_flag_layout.setSpacing(10)
+            self.player_detail_icon_widget_country_flag_layout.addWidget(self.player_detail_icon_widget_country_icon)
+            self.player_detail_icon_widget_country_flag_layout.addWidget(self.player_detail_icon_widget_country_name)
+            self.player_detail_icon_widget_country_flag_layout.addStretch(1)
             
             self.player_detail_icon_widget_player_name = QLabel(parent=self.player_detail_widget, text="PlayerID", ObjectName="player_detail_icon_widget_player_name")
             self.player_detail_icon_widget_player_name.hide()
             self.player_detail_icon_widget_country_layout.addWidget(self.player_detail_icon_widget_player_name)
             self.player_detail_icon_widget_country_layout.addStretch(1)
-            self.player_detail_icon_widget_country_layout.addWidget(self.player_detail_icon_widget_country_icon)
+            self.player_detail_icon_widget_country_layout.addLayout(self.player_detail_icon_widget_country_flag_layout)
 
             self.player_detail_icon_widget_player_mark_widget = QWidget(self.player_detail_widget)
             self.player_detail_icon_widget_player_mark_widget.setFixedSize(250, 80)
@@ -777,9 +787,11 @@ class PlayerDetail:
     def __init__(self, detail_signal, add_new_game_history_signal, max_game_history):
         self.detail_url = 'https://aoe4world.com/api/v0/players/{}'
         self.game_history_url = 'https://aoe4world.com/api/v0/players/{}/games'
+        self.locale = Locale.parse("zh")
         self.detail_signal = detail_signal
         self.max_game_history = max_game_history
         self.add_new_game_history_signal = add_new_game_history_signal
+        self.country_cache = {}
 
     def set_max_game_history(self, max_game_history):
         self.max_game_history = max_game_history
@@ -834,13 +846,22 @@ class PlayerDetail:
                         data['avatars']['full'] = avatar_full_img.content
                     else:
                         data['avatars']['full'] = None
-                country_flag = data['country']
-                if country_flag:
-                    country_flag = self.get_response(f"https://flagcdn.com/w40/{country_flag.lower()}.png")
-                    if country_flag:
-                        data['country'] = country_flag.content
+                country_name_en = data['country']
+                if country_name_en:
+                    if cache_data:= self.country_cache.get(country_name_en.lower()):
+                        data['country'] = cache_data[0]
+                        data['country_name'] = cache_data[1]
                     else:
-                        data['country'] = None
+                        country_flag = self.get_response(f"https://flagcdn.com/w40/{country_name_en.lower()}.png")
+                        if country_flag:
+                            data['country'] = country_flag.content
+                            country_name = self.locale.territories[country_name_en.upper()]
+                            country_name = "中国" + country_name if country_name == "台湾" else country_name
+                            data['country_name'] = country_name
+                            self.country_cache[country_name_en.lower()] = (country_flag.content, country_name)
+                        else:
+                            data['country'] = None
+                            data['country_name'] = None
                 self.detail_signal.emit(data)
             except Exception as e:
                 print('detail error:', e)

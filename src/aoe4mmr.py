@@ -250,10 +250,9 @@ class Aoe4mmr:
                 self.mmr_window.hide()
 
     def start_data_thread(self):
+        alive = False
         if hasattr(self, "data_thread"):
             alive = self.data_thread.is_alive()
-        else:            
-            alive = False
         if not alive:
             self.data_thread = threading.Thread(target=self.data.worker, daemon=True)
             self.data_thread.start()
