@@ -8,6 +8,8 @@
 import re
 import threading
 import keyboard
+
+from settings import Settings
 # noinspection PyPackages
 from . import window_rc
 from . import my_widgets
@@ -944,127 +946,43 @@ class MmrWindow(QMainWindow):
         for combobox in mark_combobox_list:
             combobox.hide()
 
-    def gui_reload(self, data):
+    def gui_reload(self, game_data):
         # 获取到新数据时，刷新界面
-        map_name, game_id, game_mode, reload_data, kind = data
+        map_name, game_id, game_mode, reload_data, kind = game_data
         i = 0
         self.map.setText(map_name)
         self.mark_combobox_dic.clear()
+        self.resize(965, 20 * game_mode + 30)
+        offset = (8 - game_mode) // 2
         # 根据对局人数，设置窗口尺寸
-        if game_mode == 8:
-            self.resize(965, 190)
-            for data in reload_data:
-                i += 1
-                (player, civilization, pid, player_mmr, win_rate, kind) = data
-                player = self.islongname(player)
-                widget_player = self.findChild(QLabel, 'player' + str(i))
-                widget_player.setText(player)
-                widget_mmr = self.findChild(QLabel, 'player' + str(i) + 'mmr')
-                widget_mmr.setText(self.format_text(player_mmr, win_rate, i))
-                widget_icon = self.findChild(QGraphicsView, 'player' + str(i) + '_icon')
-                # 设置文明图标
-                icon = self.player_icon(civilization)
-                widget_icon.setScene(icon)
-                # 设置颜色（自己红色，其他人金色）
-                if self.checkplayer(pid):
-                    text_color = "#FF2400"
-                else:
-                    text_color = "#CC9F4A"
-                widget_player.set_text_color(text_color)
-                widget_mmr.set_text_color(text_color)
-                widget_rank = self.findChild(QGraphicsView, 'player' + str(i) + '_rank')
-                widget_combobox = self.findChild(QComboBox, 'player' + str(i) + '_mark')
-                self.mark_combobox_dic[pid] = widget_combobox
-                # 如果是排位模式，显示段位图标
-                if 'rm' in kind:
-                    widget_rank.show()
-                    widget_rank.setScene(self.player_rank(player_mmr, game_mode))
-                else:
-                    widget_rank.hide()
-        if game_mode == 6:
-            self.resize(965, 150)
-            for data in reload_data:
-                i += 1
-                if i == 4:
-                    i = 5
-                (player, civilization, pid, player_mmr, win_rate, kind) = data
-                widget_player = self.findChild(QLabel, 'player' + str(i))
-                widget_player.setText(player)
-                widget_mmr = self.findChild(QLabel, 'player' + str(i) + 'mmr')
-                widget_mmr.setText(self.format_text(player_mmr, win_rate, i))
-                widget_icon = self.findChild(QGraphicsView, 'player' + str(i) + '_icon')
-                widget_icon.setScene(self.player_icon(civilization))
-                if self.checkplayer(pid):
-                    text_color = "#FF2400"
-                else:
-                    text_color = "#CC9F4A"
-                widget_player.set_text_color(text_color)
-                widget_mmr.set_text_color(text_color)
-                widget_rank = self.findChild(QGraphicsView, 'player' + str(i) + '_rank')
-                widget_combobox = self.findChild(QComboBox, 'player' + str(i) + '_mark')
-                self.mark_combobox_dic[pid] = widget_combobox
-                if 'rm' in kind:
-                    widget_rank.show()
-                    widget_rank.setScene(self.player_rank(player_mmr, game_mode))
-                else:
-                    widget_rank.hide()
-        if game_mode == 4:
-            self.resize(965, 110)
-            for data in reload_data:
-                i += 1
-                if i == 3:
-                    i = 5
-                (player, civilization, pid, player_mmr, win_rate, kind) = data
-                widget_player = self.findChild(QLabel, 'player' + str(i))
-                widget_player.setText(player)
-                widget_mmr = self.findChild(QLabel, 'player' + str(i) + 'mmr')
-                if i < 5:
-                    widget_mmr.setText(f'{player_mmr}   {win_rate}%')
-                else:
-                    widget_mmr.setText(f'{win_rate}%   {player_mmr}')
-                widget_icon = self.findChild(QGraphicsView, 'player' + str(i) + '_icon')
-                widget_icon.setScene(self.player_icon(civilization))
-                if self.checkplayer(pid):
-                    text_color = "#FF2400"
-                else:
-                    text_color = "#CC9F4A"
-                widget_player.set_text_color(text_color)
-                widget_mmr.set_text_color(text_color)
-                widget_rank = self.findChild(QGraphicsView, 'player' + str(i) + '_rank')
-                widget_combobox = self.findChild(QComboBox, 'player' + str(i) + '_mark')
-                self.mark_combobox_dic[pid] = widget_combobox
-                if 'rm' in kind:
-                    widget_rank.show()
-                    widget_rank.setScene(self.player_rank(player_mmr, game_mode))
-                else:
-                    widget_rank.hide()
-        if game_mode == 2:
-            self.resize(965, 70)
-            for data in reload_data:
-                i += 1
-                if i == 2:
-                    i = 5
-                (player, civilization, pid, player_mmr, win_rate, kind) = data
-                widget_player = self.findChild(QLabel, 'player' + str(i))
-                widget_player.setText(player)
-                widget_mmr = self.findChild(QLabel, 'player' + str(i) + 'mmr')
-                widget_mmr.setText(self.format_text(player_mmr, win_rate, i))
-                widget_icon = self.findChild(QGraphicsView, 'player' + str(i) + '_icon')
-                widget_icon.setScene(self.player_icon(civilization))
-                if self.checkplayer(pid):
-                    text_color = "#FF2400"
-                else:
-                    text_color = "#CC9F4A"
-                widget_player.set_text_color(text_color)
-                widget_mmr.set_text_color(text_color)
-                widget_rank = self.findChild(QGraphicsView, 'player' + str(i) + '_rank')
-                widget_combobox = self.findChild(QComboBox, 'player' + str(i) + '_mark')
-                self.mark_combobox_dic[pid] = widget_combobox
-                if 'rm' in kind:
-                    widget_rank.show()
-                    widget_rank.setScene(self.player_rank(player_mmr, game_mode))
-                else:
-                    widget_rank.hide()
+        for i, data in enumerate(reload_data, 1):
+            i += ((i - 1) // (game_mode // 2)) * offset
+            (player, civilization, pid, player_mmr, win_rate, kind) = data
+            player = self.islongname(player)
+            widget_player = self.findChild(QLabel, 'player' + str(i))
+            widget_player.setText(player)
+            widget_mmr = self.findChild(QLabel, 'player' + str(i) + 'mmr')
+            widget_mmr.setText(self.format_text(player_mmr, win_rate, i))
+            widget_icon = self.findChild(QGraphicsView, 'player' + str(i) + '_icon')
+            # 设置文明图标
+            icon = self.player_icon(civilization)
+            widget_icon.setScene(icon)
+            # 设置颜色（自己红色，其他人金色）
+            if self.checkplayer(pid):
+                text_color = "#FF2400"
+            else:
+                text_color = "#CC9F4A"
+            widget_player.set_text_color(text_color)
+            widget_mmr.set_text_color(text_color)
+            widget_rank = self.findChild(QGraphicsView, 'player' + str(i) + '_rank')
+            widget_combobox = self.findChild(QComboBox, 'player' + str(i) + '_mark')
+            self.mark_combobox_dic[pid] = widget_combobox
+            # 如果是排位模式，显示段位图标
+            if 'rm' in kind:
+                widget_rank.show()
+                widget_rank.setScene(self.player_rank(player_mmr, game_mode))
+            else:
+                widget_rank.hide()
         self.player_mark_reload()
         self.show()
         self.hide_timer.stop()

@@ -118,7 +118,7 @@ class Aoe4mmr:
             self.settings.window_location = [values.x(), values.y()]
         elif key == 'picked_profile_id':
             self.settings.picked_profile_id = values
-            self.data.profile_id = values
+            self.data.set_profile_id(values)
             self.mmr_window.tracking_id = values
         elif key == 'delete_profile_id':
             self.settings.delete_profile_id(values)
@@ -129,7 +129,7 @@ class Aoe4mmr:
         try:
             self.settings.update_profile_id(*player_info)
             self.settings.picked_profile_id = (player_info[0])
-            self.data.profile_id = self.settings.picked_profile_id
+            self.data.set_profile_id(self.settings.picked_profile_id)
             self.main_window.left_menu.toolbutton_dic['home_button'][0].click()
             self.gui_reload(reason='reload player', data=self.settings.profile_id)
         except Exception as e:

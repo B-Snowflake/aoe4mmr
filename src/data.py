@@ -10,6 +10,7 @@ import json
 import time
 import sqlite3
 import threading
+from . import settings
 import traceback
 import requests
 import func_timeout
@@ -29,8 +30,13 @@ class Data:
         self.map_dic = {key: values[0] for key, values in map_dic.items()}  # 地图中英文对照表
         self.version_check_url = 'https://github.com/B-Snowflake/aoe4mmr/releases/latest'
         self.version_check_time = None
+        self.game_data_request_time = 0
         self.version_player_check()
-        
+
+    def set_profile_id(self, profile_id):
+        self.profile_id = profile_id
+        self.game_data_request_time = 0
+
     def version_player_check(self):
         threading.Thread(target=self.update_player_name, daemon=True).start()
         threading.Thread(target=self.new_version_check, daemon=True).start()
@@ -57,14 +63,14 @@ class Data:
         for profile_id in self.profile_id_list:
             name = None
             try:
-                playerdata = self.get_response('https://aoe4world.com/api/v0/players/' + str(profile_id))
-                if playerdata.status_code == 200:
-                    name = json.loads(playerdata.content.decode())['name']
+                player_data = self.get_response(f'https://aoe4world.com/api/v0/players/{profile_id}')
+                if player_data.status_code == 200:
+                    name = json.loads(player_data.content.decode())['name']
             except Exception as e:
-                print(e)
+                print(f'error when request player name: {e}')
             if name is not None:
-                result[profile_id] = name
-        self.gui_reload('reload playername', result)
+                result[profile_id] = settings.ProfileId(profile_id, name)
+        self.gui_reload('reload player', result)
 
     @retry(stop_max_attempt_number=10)
     def get_response(self, url):
@@ -79,6 +85,7 @@ class Data:
     def get_data(self):
         # 从API接口获取最新的游戏对局数据
         player_data_list = []
+        game_data_list = []
         error = False
         try:
             # 获取最新游戏对局
@@ -87,8 +94,8 @@ class Data:
                 last_game_json = json.loads(last_game.content.decode())
                 game_id = last_game_json['game_id']
                 # 如果该局游戏是新开的，则请求该对局数据
-                if game_id != self.last_game_id and last_game_json['ongoing']:
-                # if game_id != self.last_game_id:
+                # if game_id != self.last_game_id and last_game_json['ongoing']:
+                if game_id != self.last_game_id:
                     map_english = last_game_json['map']
                     map_chinese = self.map_dic.get(map_english, map_english)
                     teams = last_game_json['teams']
@@ -104,6 +111,7 @@ class Data:
                         kind = last_game_kind
                     i = 0
                     player_counts = 0
+                    request_again_count = 0
                     for elements in teams:
                         i += 1
                         for element in elements:
@@ -118,17 +126,16 @@ class Data:
                             # 根据游戏类型（排位、快速比赛、3V3/4V4/2V2/1V1）请求玩家mmr
                             player_leaderboards = self.get_response(f'https://aoe4world.com/api/v0/leaderboards/{kind}?profile_id={player_profile_id}')
                             player_leaderboards_json = json.loads(player_leaderboards.content.decode())
-                            if bool(player_leaderboards_json['players']):
+                            if data:= player_leaderboards_json.get('players'):
                                 # player_mmr = player_leaderboards_json['players'][0]['rating']
-                                win_rate = player_leaderboards_json['players'][0]['win_rate']
+                                win_rate = data[0]['win_rate']
                             else:
                                 # player_mmr = '--'
                                 win_rate = '--'
                             values = (game_id, player, str(win_rate), civilization, map_chinese, str(player_profile_id), str(player_mmr), str(i), kind)
                             insert_sql = ("INSERT INTO last_game ( game_id, player, win_rate, civilization, map, profile_id, player_mmr, team, kind ) "
                                           "VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? )")
-                            # 写入数据库
-                            self.database_queue.put((insert_sql, values))
+                            game_data_list.append((insert_sql, values))
                             player_data_list.append((str(player), civilization, str(player_profile_id), str(player_mmr), str(win_rate), str(kind)))
                     # 数据校验，如果本次请求的数据缺失，终止
                     if last_game_kind in ('rm_1v1', 'qm_1v1') and player_counts != 2:
@@ -144,11 +151,17 @@ class Data:
                         print(f'game_id:{game_id}, 本次获取的数据不完整')
                         return
                     else:
-                        self.last_game_id = game_id
+                        self.game_data_request_time += 1
+                        print(f'{game_id}:第{self.game_data_request_time}次数据请求完成')
+                        if self.game_data_request_time == 3:
+                            self.last_game_id = game_id
+                            # 写入数据库
+                            for insert_sql, values in game_data_list:
+                                self.database_queue.put((insert_sql, values))
                         # 重载gui界面
                         last_game_data = (map_chinese, str(game_id), len(player_data_list), player_data_list, kind)
                         self.gui_reload('reload game', last_game_data)
-                        self.database_queue.put(("delete from last_game where game_id <> ?", (game_id, )))
+                        self.database_queue.put(("delete from last_game where game_id <> ?", (game_id,)))
         except Exception as e:
             # 发生异常时，写入异常信息
             new_content = "\n" + time.strftime("%Y.%m.%d %H:%M:%S") + ": when request exception -- " + str(traceback.format_exc())
@@ -164,6 +177,8 @@ class Data:
                 except func_timeout.exceptions.FunctionTimedOut as e:
                     new_content = "\n" + time.strftime("%Y.%m.%d %H:%M:%S") + ": when timesleep exception -- " + str(e)
                     print(new_content)
+                if self.game_data_request_time == 3:
+                    self.game_data_request_time = 0
                 time.sleep(10)
             else:
                 break

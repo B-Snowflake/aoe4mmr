@@ -91,6 +91,7 @@ class MenuPage(QStackedWidget):
         self.map_dic = map_dic
         self.database_queue = database_queue
         self.max_show_game_history = max_show_game_history
+        self.added_player_info = None
         self.player_account_widget_reload_toolbutton_angle = 0
         self.data_loader_timer = QTimer(parent=self, interval=20)
         self.data_loader_timer.timeout.connect(self.rotate_image)
@@ -343,9 +344,10 @@ class MenuPage(QStackedWidget):
         # 4. 按顺序重新加入
         for w in widgets:
             self.player_game_history_widget_layout.addWidget(w)
-            
-    @staticmethod
-    def set_by_data(combo, target):
+
+    def set_by_data(self, target, combo=None):
+        if combo is None:
+            combo = self.player_account_widget_combobox
         index = combo.findData(target) if combo.findData(target) != -1 else 0
         return index
 
@@ -423,16 +425,21 @@ class MenuPage(QStackedWidget):
             self.settings_changed_signal.emit(('picked_profile_id', profile_id))
 
     def add_my_accounts_to_combobox(self, data):
+        picked_profile_id = self.added_player_info if self.added_player_info else self.picked_profile_id
+        reload = True if self.player_account_widget_combobox.currentIndex() != self.set_by_data(picked_profile_id) else False
         self.player_account_widget_combobox.blockSignals(True)
         self.player_account_widget_combobox.clear()
         accounts = [(value.profile_name, value.profile_id) for key, value in data.items()]
         for profile_name, profile_id in accounts:
             self.player_account_widget_combobox.addItem(profile_name, profile_id)
         self.player_account_widget_combobox.setCurrentIndex(-1)
-        self.player_account_widget_combobox.blockSignals(False)
-        picked_profile_id = self.applied_player_info[0] if self.applied_player_info else self.picked_profile_id
-        self.player_account_widget_combobox.setCurrentIndex(self.set_by_data(self.player_account_widget_combobox, picked_profile_id))
-        self.applied_player_info = None
+        if reload:
+            self.player_account_widget_combobox.blockSignals(False)
+            self.player_account_widget_combobox.setCurrentIndex(self.set_by_data(picked_profile_id))
+        else:
+            self.player_account_widget_combobox.setCurrentIndex(self.set_by_data(picked_profile_id))
+            self.player_account_widget_combobox.blockSignals(False)
+        self.added_player_info = None
             
     def set_new_page(self):
         
@@ -601,6 +608,7 @@ class MenuPage(QStackedWidget):
     
     def add_new_account(self):
         if self.applied_player_info:
+            self.added_player_info = self.applied_player_info[0]
             self.add_new_account_signal.emit(self.applied_player_info)
         
 class SearchCompleter(QLineEdit):
