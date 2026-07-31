@@ -5,17 +5,14 @@
 # Author: B_Snowflake
 # Date: 2025/4/2
 
-import pytz
 import json
 import time
-import sqlite3
 import threading
 from . import settings
 import traceback
 import requests
 import func_timeout
 from retrying import retry
-from datetime import datetime
 
 
 class Data:
@@ -31,7 +28,8 @@ class Data:
         self.version_check_url = 'https://github.com/B-Snowflake/aoe4mmr/releases/latest'
         self.version_check_time = None
         self.game_data_request_time = 0
-        self.game_data_max_request_time = 2
+        self.game_data_max_request_time = 3
+        self.refresh = False
         self.version_player_check()
 
     def set_profile_id(self, profile_id):
@@ -49,29 +47,18 @@ class Data:
             latest_version = response.url.split("/")[-1]
             self.new_version_func(latest_version)
 
-    @staticmethod
-    def timezone_convert(utc_time_str):
-        # 将UTC时间转换到北京时间
-        utc_dt = datetime.strptime(utc_time_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-        utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
-        beijing_tz = pytz.timezone("Asia/Shanghai")
-        beijing_dt = utc_dt.astimezone(beijing_tz)
-        return beijing_dt.strftime("%Y-%m-%d %H:%M:%S")
-
     def update_player_name(self):
         # 启动时更新已保存的账户名（考虑用户可能会更改ID）
-        result = {}
-        for profile_id in self.profile_id_list:
-            name = None
+        print('updating')
+        for profile_id in self.profile_id_list.keys():
             try:
                 player_data = self.get_response(f'https://aoe4world.com/api/v0/players/{profile_id}')
                 if player_data.status_code == 200:
-                    name = json.loads(player_data.content.decode())['name']
+                    name = str(json.loads(player_data.content.decode())['name'])
+                    self.profile_id_list[profile_id] = settings.ProfileId(profile_id, name)
             except Exception as e:
                 print(f'error when request player name: {e}')
-            if name is not None:
-                result[profile_id] = settings.ProfileId(profile_id, name)
-        self.gui_reload('reload player', result)
+        self.gui_reload('reload player', self.profile_id_list)
 
     @retry(stop_max_attempt_number=10)
     def get_response(self, url):
@@ -95,8 +82,8 @@ class Data:
                 last_game_json = json.loads(last_game.content.decode())
                 game_id = last_game_json['game_id']
                 # 如果该局游戏是新开的，则请求该对局数据
-                # if game_id != self.last_game_id and last_game_json['ongoing']:
-                if game_id != self.last_game_id:
+                if (game_id != self.last_game_id and last_game_json['ongoing']) or self.refresh == True:
+                # if game_id != self.last_game_id or self.refresh == True:
                     map_english = last_game_json['map']
                     map_chinese = self.map_dic.get(map_english, map_english)
                     teams = last_game_json['teams']
@@ -112,7 +99,6 @@ class Data:
                         kind = last_game_kind
                     i = 0
                     player_counts = 0
-                    request_again_count = 0
                     for elements in teams:
                         i += 1
                         for element in elements:
@@ -149,6 +135,9 @@ class Data:
                         error = True
                     if not error:
                         self.game_data_request_time += 1
+                        if self.refresh:
+                            self.refresh = False
+                            self.game_data_request_time = self.game_data_max_request_time
                         print(f'{game_id}:第{self.game_data_request_time}次数据请求完成')
                         if self.game_data_request_time == self.game_data_max_request_time:
                             self.last_game_id = game_id

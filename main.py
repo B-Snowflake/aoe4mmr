@@ -12,6 +12,7 @@ import traceback
 from src.aoe4mmr import Aoe4mmr, MouseFilter
 from PySide6.QtCore import QStandardPaths, Qt
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import qInstallMessageHandler
 
 
 app_name = "Aoe4mmr"
@@ -51,7 +52,19 @@ def thread_exception_handler(args):
 
 threading.excepthook = thread_exception_handler
     
-    
+
+def handler(mode, context, message):
+    print(
+        f"{message}\n"
+        f"file={context.file}\n"
+        f"line={context.line}\n"
+        f"function={context.function}"
+    )
+
+
+qInstallMessageHandler(handler)
+
+
 if __name__ == "__main__":
     pid_path = base_path / "pid"
     # 仅单实例运行，启动时校验实例是否已经运行

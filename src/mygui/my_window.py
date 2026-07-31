@@ -1,16 +1,10 @@
-#!/usr/bin/env python3 
-# Author: B_Snowflake 
-# Date: 2026/5/27 18:45:19 
-# LastEditTime: 2026/5/27 18:45:19#!/usr/bin/python3
+#!/usr/bin/python3
 # Author: B_Snowflake
 # Date: 2026/3/21
 
 import re
 import threading
 import keyboard
-
-from settings import Settings
-# noinspection PyPackages
 from . import window_rc
 from . import my_widgets
 from PySide6.QtGui import *
@@ -1275,4 +1269,3 @@ class CustomMessageBox(QDialog):
         self.message_button_layout.addWidget(self.message_cancle_button)
         self.message_widget_layout.addLayout(self.message_layout)
         self.message_widget_layout.addLayout(self.message_button_layout)
-        

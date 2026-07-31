@@ -37,7 +37,7 @@ class Aoe4mmr:
         threading.Thread(target=self.write_to_db, daemon=True).start()
         self.settings = settings.Settings()
         self.settings.load(self.settings_path)                      
-        self.data = data.Data(self.gui_reload, self.settings.picked_profile_id, self.database_queue, self.map_dic, self.settings.profile_id.keys(), self.new_version)
+        self.data = data.Data(self.gui_reload, self.settings.picked_profile_id, self.database_queue, self.map_dic, self.settings.profile_id, self.new_version)
         self.game_process_check_timer = QTimer()
         self.game_process_check_timer.setInterval(10000)
         self.game_process_check_timer.timeout.connect(self.game_process_check_timer_timeout)
@@ -54,6 +54,7 @@ class Aoe4mmr:
         self.main_window.add_new_account_signal.connect(self.add_new_account)
         self.main_window.settings_changed_signal.connect(self.on_settings_changed)
         self.mmr_window.settings_changed_signal.connect(self.on_settings_changed)
+        self.main_window.menu_page.refresh_data_signal.connect(self.refresh_data)
         self.main_window.setFixedSize(900, 600)
         self.main_window.setMinimumSize(900, 600)
         self.main_window.setMaximumSize(900, 600)
@@ -87,8 +88,11 @@ class Aoe4mmr:
             self.main_window.left_menu.toolbutton_dic['new_button'][0].click()
         else:
             self.main_window.left_menu.toolbutton_dic['home_button'][0].click()
-            self.gui_reload(reason="reload player", data=self.settings.profile_id)        
-    
+            self.gui_reload(reason="reload player", data=self.settings.profile_id)
+
+    def refresh_data(self):
+        self.data.refresh = True
+
     def backward_forward(self, step):
         index_len = self.main_window.left_menu.button_record.__len__()
         if step == "forward" and self.main_window.left_menu.record_offset_index < 0:        

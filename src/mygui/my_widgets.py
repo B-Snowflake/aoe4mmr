@@ -74,6 +74,7 @@ class MenuPage(QStackedWidget):
     detail_signal = Signal(dict)
     apply_signal = Signal(tuple)
     add_new_game_history_signal = Signal(list)
+    refresh_data_signal = Signal()
     
     def __init__(self, add_new_account_signal, settings_changed_signal, max_show_game_history, max_accounts,
                  picked_profile_id, civilization_icon_dic, map_dic, rank_icon_dic, database_queue, player_mark_dic, *args, **kwargs):
@@ -356,6 +357,7 @@ class MenuPage(QStackedWidget):
 
     def on_reload_toolbutton_clicked(self):
         self.on_player_account_widget_combobox_currentIndexChanged(self.player_account_widget_combobox.currentIndex())
+        self.refresh_data_signal.emit()
 
     def rotate_image(self):
         self.player_account_widget_reload_toolbutton_angle += 5
@@ -374,8 +376,8 @@ class MenuPage(QStackedWidget):
 
     def set_home_page(self):
         self.home_page_layout = QVBoxLayout(self.home_page)
-        self.player_account_widget = QTableWidget(self.home_page)
-        self.player_account_widget_layout = QHBoxLayout(self.player_account_widget)
+        self.player_account_widget = QWidget(self.home_page)
+        self.player_account_widget_layout = QHBoxLayout()
         self.player_account_widget_label = QLabel(self.player_account_widget, text="我的账户：")
         self.player_account_widget_combobox = QComboBox(self.player_account_widget)
         self.player_account_widget_combobox.setMaximumWidth(250)
@@ -391,7 +393,7 @@ class MenuPage(QStackedWidget):
         # self.player_account_widget_reload_toolbutton_pixmap = QPixmap(':images/icons/cil-reload.svg').scaled(self.player_account_widget_reload_toolbutton.size())
         # self.player_account_widget_reload_toolbutton.setIcon(self.player_account_widget_reload_toolbutton_pixmap)
 
-        self.player_account_widget_account_layout  = QHBoxLayout(self.player_account_widget)
+        self.player_account_widget_account_layout  = QHBoxLayout()
         self.player_account_widget_account_layout.setContentsMargins(0, 0, 0, 0)
         self.player_account_widget_account_layout.setSpacing(30)
         self.player_account_widget_account_layout.addWidget(self.player_account_widget_combobox, alignment=Qt.AlignmentFlag.AlignLeft)
